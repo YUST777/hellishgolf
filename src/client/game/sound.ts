@@ -17,6 +17,7 @@
  */
 
 const BASE = 'game/audio';
+const MUTE_STORAGE_KEY = 'khg_muted';
 
 export type Sfx =
   | 'BallHit'
@@ -58,6 +59,7 @@ class SoundManager {
   init() {
     if (this.ready) return;
     this.ext = pickExt();
+    this.muted = localStorage.getItem(MUTE_STORAGE_KEY) === 'true';
     // Build a tiny pool per SFX so rapid repeats (bounces) can overlap.
     (Object.keys(FILES) as Sfx[]).forEach((key) => {
       if (key === 'Ambient') return;
@@ -74,6 +76,7 @@ class SoundManager {
 
   setMuted(m: boolean) {
     this.muted = m;
+    localStorage.setItem(MUTE_STORAGE_KEY, String(m));
     if (m && this.ambient) this.ambient.pause();
     else if (!m && this.ambient) void this.ambient.play().catch(() => {});
   }

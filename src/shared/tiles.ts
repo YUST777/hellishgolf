@@ -75,6 +75,26 @@ const rampUpSet = new Set(T_RAMP_UP);
 const rampDownSet = new Set(T_RAMP_DOWN);
 const solidSet = new Set(SOLID_TILE_IDS);
 
+export type RampShape =
+  | 'ground-up'
+  | 'ground-down'
+  | 'ceiling-up'
+  | 'ceiling-down';
+
+/** Exact triangular collider orientation for each ramp tileId. */
+export function rampShapeOfId(id: number): RampShape | null {
+  if (id === 172) return 'ground-up';
+  if (id === 173) return 'ground-down';
+  if (id === 169) return 'ceiling-up';
+  if (id === 202) return 'ceiling-down';
+  return null;
+}
+
+/** Flags are sensors/decor; only this exact bundle list creates solid geometry. */
+export function isSolidId(id: number): boolean {
+  return solidSet.has(id);
+}
+
 /**
  * Tiled stores horizontal/vertical/diagonal flip flags in the top 3 bits of a
  * gid. Mask them off to recover the real gid.
