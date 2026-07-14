@@ -899,10 +899,13 @@ export class GameScene extends Phaser.Scene {
     }
     this.inRough = overRough;
 
-    // Kinda Infuriating Mode disables checkpoints entirely.
+    // Kinda Infuriating Mode disables checkpoints entirely. Otherwise the flag
+    // activates generously (within ~2 tiles) so landing anywhere on its
+    // platform — or rolling past it — saves the respawn point.
     if (!this.infuriating) {
       for (const cp of this.checkpointCells) {
-        if (Phaser.Geom.Rectangle.Contains(cp.rect, bx, by)) {
+        const c = this.cellCenter(cp.col, cp.row);
+        if (Phaser.Math.Distance.Between(bx, by, c.x, c.y) <= TILE * 2) {
           this.hitCheckpoint(cp.col, cp.row);
         }
       }
