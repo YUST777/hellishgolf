@@ -103,9 +103,9 @@ function toast(message: string) {
 }
 
 function updatePowerupHud() {
+  textIfPresent('wallet-coins', String(powerups.coins));
   textIfPresent('shop-coin-badge', String(powerups.coins));
   textIfPresent('shop-wallet-coins', String(powerups.coins));
-  let hasQuickUse = false;
   for (const kind of POWERUP_ORDER) {
     const count = powerups.inventory[kind];
     const canUse = count > 0;
@@ -132,10 +132,7 @@ function updatePowerupHud() {
             : `No ${POWERUP_NAMES[kind]} owned`;
       button.setAttribute('aria-label', button.title);
     }
-    hasQuickUse ||= showQuickUse;
   }
-  const quickBar = document.getElementById('powerup-bar');
-  if (quickBar) quickBar.hidden = !hasQuickUse;
   updateShop();
 }
 

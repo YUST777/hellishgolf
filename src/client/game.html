@@ -224,6 +224,21 @@
       .powerup-btn[hidden] {
         display: none !important;
       }
+      #coin-wallet {
+        min-width: 58px;
+        height: 42px;
+        padding: 0 10px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        font-weight: 800;
+        color: #4a2c17;
+        background: #ffd65a;
+        border: 2px solid #8a4b0f;
+        box-shadow: inset 0 2px rgba(255, 255, 255, 0.45);
+      }
       .coin-icon {
         width: 14px;
         height: 14px;
@@ -315,6 +330,11 @@
           bottom: 12px;
           max-width: calc(100vw - 96px);
           gap: 5px;
+        }
+        #coin-wallet {
+          min-width: 48px;
+          height: 38px;
+          padding: 0 8px;
         }
         .powerup-btn {
           width: 54px;
@@ -806,6 +826,10 @@
     </div>
 
     <div id="powerup-bar" aria-label="Powerups">
+      <div id="coin-wallet" title="Coins">
+        <span class="coin-icon"></span>
+        <span id="wallet-coins">0</span>
+      </div>
       <button class="powerup-btn" data-powerup="trajectory" title="No Trajectory owned" aria-label="No Trajectory owned" disabled>
         <span class="powerup-icon">&#10022;</span>
         <span class="powerup-count" id="powerup-trajectory-count">x0</span>
