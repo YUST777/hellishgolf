@@ -762,12 +762,18 @@ export class GameScene extends Phaser.Scene {
     this.applyChargeZoom(raw);
   }
 
-  /** Ease-in charge zoom-out: camera pulls back as power builds. */
+  /**
+   * Ease-in charge zoom-out: the camera pulls back as power builds. The
+   * pull-back is proportional to the current zoom, so it's clamped to a floor
+   * (and to at most ~40% of the resting zoom) — otherwise charging a full shot
+   * while already zoomed out drops the zoom to an unusable value.
+   */
   private applyChargeZoom(power: number) {
     const elapsed = this.time.now - this.aimStart;
     const t = Phaser.Math.Clamp(elapsed / 370, 0, 1); // ~22 frames @60fps
     const ease = 1 - (1 - t) * (1 - t);
-    const target = this.zoom * (1 - 0.676 * power * ease);
+    let target = this.zoom * (1 - 0.676 * power * ease);
+    target = Math.max(target, this.zoom * 0.6, 0.28);
     this.cameras.main.setZoom(target);
   }
 
