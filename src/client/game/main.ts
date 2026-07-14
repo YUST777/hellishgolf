@@ -89,29 +89,46 @@ function updatePowerupHud() {
   el('wallet-coins').textContent = String(powerups.coins);
   for (const kind of POWERUP_ORDER) {
     const count = powerups.inventory[kind];
+    const price = POWERUP_PRICES[kind];
+    const canBuy = count === 0 && powerups.coins >= price;
+    const canUse = count > 0;
+    const isActive = activePowerup === kind;
     const button = document.querySelector<HTMLButtonElement>(
       `.powerup-btn[data-powerup="${kind}"]`
     );
     const countNode = document.getElementById(`powerup-${kind}-count`);
-    const priceNode = document.getElementById(`powerup-${kind}-price`);
-    if (countNode) countNode.textContent = String(count);
-    if (priceNode) priceNode.textContent = String(POWERUP_PRICES[kind]);
+    const actionNode = document.getElementById(`powerup-${kind}-action`);
+    if (countNode) countNode.textContent = `x${count}`;
+    if (actionNode) {
+      actionNode.textContent = isActive
+        ? 'READY'
+        : canUse
+          ? 'USE'
+          : canBuy
+            ? `BUY ${price}`
+            : `NEED ${price}`;
+    }
     if (button) {
-      button.classList.toggle('can-buy', count === 0 && powerups.coins >= POWERUP_PRICES[kind]);
+      button.classList.toggle('can-buy', canBuy);
+      button.classList.toggle('can-use', canUse);
       button.classList.toggle('empty', count === 0);
+      button.classList.toggle('active', isActive);
       button.title =
-        count > 0
-          ? `Use ${POWERUP_NAMES[kind]}`
-          : `Buy ${POWERUP_NAMES[kind]} for ${POWERUP_PRICES[kind]} coins`;
+        isActive
+          ? `${POWERUP_NAMES[kind]} ready`
+          : canUse
+            ? `Use ${POWERUP_NAMES[kind]}`
+            : canBuy
+              ? `Buy ${POWERUP_NAMES[kind]} for ${price} coins`
+              : `Need ${price} coins for ${POWERUP_NAMES[kind]}`;
+      button.setAttribute('aria-label', button.title);
     }
   }
 }
 
 function setActivePowerup(kind: PowerupKind | null) {
   activePowerup = kind;
-  document.querySelectorAll<HTMLButtonElement>('.powerup-btn').forEach((button) => {
-    button.classList.toggle('active', button.dataset.powerup === kind);
-  });
+  updatePowerupHud();
 }
 
 function onCoinCollected(coinId: string) {
