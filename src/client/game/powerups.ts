@@ -103,6 +103,13 @@ export function collectCoin(
   return true;
 }
 
+export function grantCoins(state: PowerupState, amount: number): number {
+  const add = Math.max(0, Math.floor(amount));
+  state.coins += add;
+  savePowerupState(state);
+  return state.coins;
+}
+
 export function buyPowerup(state: PowerupState, kind: PowerupKind): boolean {
   const price = POWERUP_PRICES[kind];
   if (state.coins < price) return false;

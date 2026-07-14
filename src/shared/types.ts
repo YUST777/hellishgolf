@@ -93,15 +93,21 @@ export interface LeaderboardResponse {
   you: LeaderboardEntry | null;
 }
 
-/** A single shot in a completed run, enough to replay the ball launches. */
-export interface ReplayMove {
-  /** 1-based shot number. */
-  shot: number;
+export type ReplayMove = ReplayShotMove | ReplayPowerupMove;
+
+interface ReplayBaseMove {
   /** Milliseconds since the hole started. */
   t: number;
-  /** Ball position in world pixels at launch. */
+  /** Ball position in world pixels when the event happened. */
   x: number;
   y: number;
+}
+
+/** A single shot in a completed run, enough to replay the ball launches. */
+export interface ReplayShotMove extends ReplayBaseMove {
+  type: 'shot';
+  /** 1-based shot number. */
+  shot: number;
   /** Drag vector in world pixels used to aim the shot. */
   dragX: number;
   dragY: number;
@@ -110,6 +116,14 @@ export interface ReplayMove {
   /** Rapier launch velocity in metres per second. */
   velocityX: number;
   velocityY: number;
+}
+
+/** A powerup action in a completed run. */
+export interface ReplayPowerupMove extends ReplayBaseMove {
+  type: 'powerup';
+  powerup: 'trajectory' | 'sticky' | 'checkpoint';
+  targetX?: number;
+  targetY?: number;
 }
 
 /** Request to create a user-generated hole from a seed. */

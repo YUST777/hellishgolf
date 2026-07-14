@@ -350,6 +350,8 @@ export class GameScene extends Phaser.Scene {
       }
       this.trajectoryShots = Math.max(this.trajectoryShots, 1);
       this.pendingPowerup = null;
+      this.setCursor('default');
+      this.recordPowerupMove('trajectory');
       this.game.events.emit('powerup-consumed', kind);
       this.game.events.emit('powerup-disarmed');
       this.game.events.emit('powerup-ready', 'Trajectory ready for your next shot.');
@@ -369,7 +371,10 @@ export class GameScene extends Phaser.Scene {
         this.game.events.emit('powerup-failed', 'Land on ground before making a checkpoint.');
         return;
       }
+      this.pendingPowerup = null;
+      this.setCursor('default');
       this.generatedCheckpointUsed = true;
+      this.recordPowerupMove('checkpoint');
       this.respawn.set(this.ball.x, this.ball.y);
       this.playGeneratedCheckpoint(this.ball.x, this.ball.y);
       this.playCheckpointGlow(this.ball.x, this.ball.y);
@@ -1026,6 +1031,33 @@ export class GameScene extends Phaser.Scene {
     this.input.setDefaultCursor(GameScene.CURSOR[state]);
   }
 
+  private elapsedMs(): number {
+    return Math.max(0, Math.round(this.time.now - this.startTime));
+  }
+
+  private roundPx(value: number): number {
+    return Math.round(value * 1000) / 1000;
+  }
+
+  private recordPowerupMove(
+    powerup: PowerupKind,
+    target?: { x: number; y: number }
+  ) {
+    this.moves.push({
+      type: 'powerup',
+      powerup,
+      t: this.elapsedMs(),
+      x: this.roundPx(this.ball.x),
+      y: this.roundPx(this.ball.y),
+      ...(target
+        ? {
+            targetX: this.roundPx(target.x),
+            targetY: this.roundPx(target.y),
+          }
+        : {}),
+    });
+  }
+
   private setupInput() {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       sound.startAmbient();
@@ -1192,6 +1224,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.placeSlimePatch(world.x, world.y);
+    this.recordPowerupMove('sticky', { x: world.x, y: world.y });
     this.pendingPowerup = null;
     this.setCursor('default');
     this.game.events.emit('powerup-consumed', 'sticky');
@@ -1318,15 +1351,16 @@ export class GameScene extends Phaser.Scene {
     const velocityX = dir.x * speed;
     const velocityY = dir.y * speed;
     this.moves.push({
+      type: 'shot',
       shot: this.strokes,
-      t: Math.max(0, Math.round(this.time.now - this.startTime)),
-      x: Math.round(this.ball.x * 1000) / 1000,
-      y: Math.round(this.ball.y * 1000) / 1000,
-      dragX: Math.round(v.x * 1000) / 1000,
-      dragY: Math.round(v.y * 1000) / 1000,
+      t: this.elapsedMs(),
+      x: this.roundPx(this.ball.x),
+      y: this.roundPx(this.ball.y),
+      dragX: this.roundPx(v.x),
+      dragY: this.roundPx(v.y),
       power: Math.round(power * 10000) / 10000,
-      velocityX: Math.round(velocityX * 1000) / 1000,
-      velocityY: Math.round(velocityY * 1000) / 1000,
+      velocityX: this.roundPx(velocityX),
+      velocityY: this.roundPx(velocityY),
     });
     this.ballBody.setLinvel({ x: velocityX, y: velocityY }, true);
     this.ballBody.setAngvel(0, true);

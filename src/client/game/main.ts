@@ -24,7 +24,9 @@ import {
   collectCoin,
   collectedCoinIds,
   consumePowerup,
+  grantCoins,
   loadPowerupState,
+  savePowerupState,
   type PowerupKind,
 } from './powerups';
 
@@ -67,6 +69,7 @@ let init: InitResponse | null = null;
 let runtimeMap: RuntimeMap | null = null;
 let powerups = loadPowerupState();
 let toastTimer: number | null = null;
+let activePowerup: PowerupKind | null = null;
 
 function setHud(strokes: number, best: number | null, streak: number) {
   el('hud-strokes').textContent = String(strokes);
@@ -105,6 +108,7 @@ function updatePowerupHud() {
 }
 
 function setActivePowerup(kind: PowerupKind | null) {
+  activePowerup = kind;
   document.querySelectorAll<HTMLButtonElement>('.powerup-btn').forEach((button) => {
     button.classList.toggle('active', button.dataset.powerup === kind);
   });
@@ -119,6 +123,10 @@ function onCoinCollected(coinId: string) {
 }
 
 function requestPowerup(kind: PowerupKind) {
+  if (activePowerup && activePowerup !== kind) {
+    game?.events.emit('powerup-cancel');
+    setActivePowerup(null);
+  }
   if (powerups.inventory[kind] <= 0) {
     if (buyPowerup(powerups, kind)) {
       updatePowerupHud();
@@ -129,6 +137,34 @@ function requestPowerup(kind: PowerupKind) {
     return;
   }
   game?.events.emit('powerup-request', kind);
+}
+
+function canUseTestCoins(data?: InitResponse): boolean {
+  return (
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1' ||
+    location.hostname === '::1' ||
+    location.hostname === '[::1]' ||
+    data?.postId === 'preview_post'
+  );
+}
+
+function applyTestCoinsFromUrl(data: InitResponse) {
+  if (!canUseTestCoins(data)) return;
+  const raw = new URLSearchParams(location.search).get('testcoins');
+  if (!raw) return;
+  const target = Math.max(0, Math.min(999, Math.floor(Number(raw) || 0)));
+  if (target > powerups.coins) {
+    powerups.coins = target;
+    savePowerupState(powerups);
+  }
+}
+
+function grantTestCoins() {
+  if (!canUseTestCoins(init ?? undefined)) return;
+  grantCoins(powerups, 50);
+  updatePowerupHud();
+  toast('+50 test coins');
 }
 
 /** Load the raw Tiled JSON for a map id and parse it into the runtime model. */
@@ -326,6 +362,8 @@ function hide(id: string) {
 }
 
 function retry() {
+  game?.events.emit('powerup-cancel');
+  setActivePowerup(null);
   hide('result-overlay');
   hide('menu-overlay');
   hide('reset-overlay');
@@ -463,6 +501,12 @@ function wireUi() {
   paintSound();
   el('btn-mute').addEventListener('click', toggleSound);
 
+  window.addEventListener('keydown', (event) => {
+    if (event.key.toLowerCase() !== 'c' || !canUseTestCoins(init ?? undefined)) return;
+    if ((event.target as HTMLElement | null)?.closest('input, textarea, select')) return;
+    grantTestCoins();
+  });
+
   // Reflect Infuriating Mode state on the title badge at startup.
   paintInfuriating();
 }
@@ -497,6 +541,7 @@ async function main() {
   try {
     // Load the Rapier engine (WASM) and the hole data in parallel.
     const [data] = await Promise.all([apiClient.init(), ensureRapier()]);
+    applyTestCoinsFromUrl(data);
     const map = await loadMap(data.mapId);
     startGame(data, map);
     wireGameEvents();

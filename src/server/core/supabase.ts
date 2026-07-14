@@ -203,6 +203,18 @@ function rounded(value: number, places = 3): number {
   return Math.round(value * scale) / scale;
 }
 
+function sanitizeBaseMove(move: Record<string, unknown>): Pick<ReplayMove, 't' | 'x' | 'y'> | null {
+  const t = clampNumber(move.t, 0, 86_400_000);
+  const x = clampNumber(move.x, -MAX_COORD, MAX_COORD);
+  const y = clampNumber(move.y, -MAX_COORD, MAX_COORD);
+  if (t === null || x === null || y === null) return null;
+  return {
+    t: Math.round(t),
+    x: rounded(x),
+    y: rounded(y),
+  };
+}
+
 export function sanitizeReplayMoves(value: unknown): ReplayMove[] {
   if (!Array.isArray(value)) return [];
 
@@ -210,10 +222,28 @@ export function sanitizeReplayMoves(value: unknown): ReplayMove[] {
   for (const raw of value.slice(0, MAX_REPLAY_MOVES)) {
     if (!raw || typeof raw !== 'object') continue;
     const move = raw as Record<string, unknown>;
+    const base = sanitizeBaseMove(move);
+    if (!base) continue;
+
+    if (move.type === 'powerup') {
+      const powerup = move.powerup;
+      if (powerup !== 'trajectory' && powerup !== 'sticky' && powerup !== 'checkpoint') {
+        continue;
+      }
+      const sanitized: ReplayMove = {
+        type: 'powerup',
+        powerup,
+        ...base,
+      };
+      const targetX = clampNumber(move.targetX, -MAX_COORD, MAX_COORD);
+      const targetY = clampNumber(move.targetY, -MAX_COORD, MAX_COORD);
+      if (targetX !== null) sanitized.targetX = rounded(targetX);
+      if (targetY !== null) sanitized.targetY = rounded(targetY);
+      moves.push(sanitized);
+      continue;
+    }
+
     const shot = clampNumber(move.shot, 1, 999);
-    const t = clampNumber(move.t, 0, 86_400_000);
-    const x = clampNumber(move.x, -MAX_COORD, MAX_COORD);
-    const y = clampNumber(move.y, -MAX_COORD, MAX_COORD);
     const dragX = clampNumber(move.dragX, -MAX_COORD, MAX_COORD);
     const dragY = clampNumber(move.dragY, -MAX_COORD, MAX_COORD);
     const power = clampNumber(move.power, 0, 1);
@@ -222,9 +252,6 @@ export function sanitizeReplayMoves(value: unknown): ReplayMove[] {
 
     if (
       shot === null ||
-      t === null ||
-      x === null ||
-      y === null ||
       dragX === null ||
       dragY === null ||
       power === null ||
@@ -235,10 +262,9 @@ export function sanitizeReplayMoves(value: unknown): ReplayMove[] {
     }
 
     moves.push({
+      type: 'shot',
       shot: Math.floor(shot),
-      t: Math.round(t),
-      x: rounded(x),
-      y: rounded(y),
+      ...base,
       dragX: rounded(dragX),
       dragY: rounded(dragY),
       power: rounded(power, 4),
