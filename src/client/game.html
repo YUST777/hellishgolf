@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Peak Putt</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        user-select: none;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #1f79cd;
+        color: #fff;
+        touch-action: none;
+      }
+      #game-root {
+        position: fixed;
+        inset: 0;
+      }
+      canvas {
+        display: block;
+        touch-action: none;
+      }
+
+      /* Loading ------------------------------------------------------------*/
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(to bottom right, #1f79cd, #4e99df);
+        font-size: 15px;
+        font-weight: 600;
+      }
+      #loading.hidden {
+        display: none;
+      }
+
+      /* HUD ---------------------------------------------------------------*/
+      .hud {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        z-index: 10;
+        pointer-events: none;
+        background: linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0.35),
+          rgba(0, 0, 0, 0)
+        );
+      }
+      .hud .pill {
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-weight: 700;
+        font-size: 14px;
+        display: flex;
+        gap: 6px;
+        align-items: baseline;
+      }
+      .hud .label {
+        font-size: 10px;
+        opacity: 0.7;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+      }
+      #hud-streak {
+        color: #fddf6a;
+      }
+      .hud .hole-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        line-height: 1.1;
+      }
+      #hole-date {
+        font-size: 10px;
+        opacity: 0.7;
+        font-weight: 500;
+      }
+
+      /* Leaderboard button + panel ----------------------------------------*/
+      #btn-leaderboard {
+        position: fixed;
+        right: 12px;
+        bottom: 16px;
+        z-index: 12;
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        border: 0;
+        border-radius: 50%;
+        width: 46px;
+        height: 46px;
+        font-size: 22px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      #btn-leaderboard:active {
+        transform: translateY(2px);
+      }
+
+      /* Zoom controls ------------------------------------------------------*/
+      #zoom-controls {
+        position: fixed;
+        left: 12px;
+        bottom: 16px;
+        z-index: 12;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #zoom-controls button {
+        background: rgba(0, 0, 0, 0.55);
+        color: #fff;
+        border: 0;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        font-size: 24px;
+        line-height: 1;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #zoom-controls button:active {
+        transform: translateY(2px);
+        background: rgba(0, 0, 0, 0.75);
+      }
+
+      #leaderboard-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(320px, 85vw);
+        z-index: 25;
+        background: #f5e5bd;
+        color: #4a2c17;
+        transform: translateX(100%);
+        transition: transform 0.28s ease;
+        box-shadow: -6px 0 24px rgba(0, 0, 0, 0.35);
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+      }
+      #leaderboard-panel.open {
+        transform: translateX(0);
+      }
+      #leaderboard-panel h2 {
+        margin: 0 0 2px;
+        font-size: 20px;
+      }
+      #lb-total {
+        font-size: 12px;
+        opacity: 0.75;
+        margin-bottom: 10px;
+      }
+      #btn-lb-close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: transparent;
+        border: 0;
+        font-size: 22px;
+        color: #4a2c17;
+        cursor: pointer;
+      }
+      #leaderboard-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        flex: 1;
+      }
+      #leaderboard-list li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      #leaderboard-list li.you {
+        background: #faeac3;
+        font-weight: 800;
+      }
+      #leaderboard-list .lb-rank {
+        width: 26px;
+        color: #7b3518;
+        font-weight: 700;
+      }
+      #leaderboard-list .lb-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #leaderboard-list .lb-score {
+        font-weight: 800;
+        color: #047857;
+      }
+      #leaderboard-list .lb-empty {
+        justify-content: center;
+        opacity: 0.7;
+        font-style: italic;
+      }
+
+      /* Toast --------------------------------------------------------------*/
+      #toast {
+        position: fixed;
+        left: 50%;
+        top: 64px;
+        transform: translateX(-50%) translateY(-12px);
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 16px;
+        font-size: 14px;
+        font-weight: 700;
+        z-index: 15;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s, transform 0.25s;
+      }
+      #toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* Result overlay -----------------------------------------------------*/
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.55);
+        padding: 1.5rem;
+      }
+      .overlay.hidden {
+        display: none;
+      }
+      .card {
+        background: #f5e5bd;
+        color: #4a2c17;
+        border-radius: 16px;
+        padding: 22px;
+        max-width: 340px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      }
+      .card h2 {
+        margin: 0 0 4px;
+        font-size: 24px;
+      }
+      .card .big {
+        font-size: 44px;
+        font-weight: 800;
+        color: #047857;
+        margin: 4px 0;
+      }
+      .card .sub {
+        font-size: 13px;
+        opacity: 0.8;
+        margin-bottom: 12px;
+      }
+      .card .row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+        padding: 6px 2px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      }
+      .card .btn {
+        margin-top: 16px;
+        width: 100%;
+        font-size: 16px;
+        font-weight: 800;
+        color: #fff;
+        background: #047857;
+        border: 2px solid #034d34;
+        border-radius: 12px;
+        padding: 12px;
+        cursor: pointer;
+        box-shadow: 0 4px 0 #034d34;
+      }
+      .card .btn:active {
+        transform: translateY(3px);
+        box-shadow: 0 1px 0 #034d34;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-root"></div>
+
+    <div id="loading">Loading today&rsquo;s hole&hellip;</div>
+
+    <div class="hud">
+      <div class="pill hole-meta">
+        <span><span class="label">HOLE</span> <span id="hole-number">#--</span></span>
+        <span id="hole-date">----</span>
+      </div>
+      <div class="pill">
+        <span class="label">STROKES</span> <span id="hud-strokes">0</span>
+      </div>
+      <div class="pill">
+        <span class="label">BEST</span> <span id="hud-best">&mdash;</span>
+      </div>
+      <div class="pill">
+        <span class="label">STREAK</span> <span id="hud-streak">&mdash;</span>
+      </div>
+    </div>
+
+    <button id="btn-leaderboard" title="Leaderboard">&#127942;</button>
+
+    <div id="zoom-controls">
+      <button id="btn-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+      <button id="btn-zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
+    </div>
+
+    <aside id="leaderboard-panel">
+      <button id="btn-lb-close" title="Close">&times;</button>
+      <h2>Today&rsquo;s Leaderboard</h2>
+      <div id="lb-total">&mdash;</div>
+      <ul id="leaderboard-list"></ul>
+    </aside>
+
+    <div id="toast"></div>
+
+    <div class="overlay hidden" id="result-overlay">
+      <div class="card">
+        <h2>Summit reached! &#9971;</h2>
+        <div class="big" id="result-strokes">0</div>
+        <div class="sub">strokes</div>
+        <div class="row"><span>Time</span><span id="result-time">&mdash;</span></div>
+        <div class="row"><span>Rank</span><span id="result-rank">&mdash;</span></div>
+        <button class="btn" id="btn-retry">Play again</button>
+      </div>
+    </div>
+
+    <script type="module" src="./game/main.ts"></script>
+  </body>
+</html>

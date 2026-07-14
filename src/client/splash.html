@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Peak Putt</title>
+    <style>
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden; user-select: none;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: linear-gradient(to bottom right, #1f79cd, #4e99df);
+        color: #fff;
+      }
+      .splash {
+        position: fixed; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        text-align: center; padding: 1.5rem;
+        background: linear-gradient(to bottom right, #1f79cd, #4e99df);
+      }
+      .title { line-height: 0.95; margin-bottom: 0.5rem; }
+      .title .top { font-size: 42px; font-weight: 800; display: block; }
+      .title .bottom { font-size: 84px; font-weight: 800; color: #fddf6a; display: block; }
+      .sub { font-size: 15px; opacity: 0.9; margin: 0 0 1.5rem; max-width: 22rem; }
+      .badge {
+        display: inline-flex; gap: 10px; align-items: center;
+        border: 2px solid #caa66c; background: #f5e5bd; color: #7b3518;
+        border-radius: 10px; padding: 8px 14px; margin-bottom: 1.25rem;
+        font-weight: 700;
+      }
+      .badge .n { font-size: 12px; font-weight: 500; display: block; }
+      .play {
+        font-size: 18px; font-weight: 800; color: #fff; cursor: pointer;
+        background: #047857; border: 2px solid #034d34; border-radius: 12px;
+        padding: 14px 28px; box-shadow: 0 4px 0 #034d34, 0 6px 8px rgba(0,0,0,0.25);
+        transition: transform 0.1s, box-shadow 0.1s;
+      }
+      .play:active { transform: translateY(3px); box-shadow: 0 1px 0 #034d34; }
+      .hill {
+        position: absolute; bottom: 0; left: 0; width: 100%; height: 120px; z-index: -1;
+      }
+      .foot { position: absolute; bottom: 10px; font-size: 11px; opacity: 0.6; }
+    </style>
+  </head>
+  <body>
+    <div class="splash">
+      <div class="title">
+        <span class="top">Peak</span>
+        <span class="bottom">Putt</span>
+      </div>
+      <p class="sub">A daily climb-the-hole golf game. Aim, launch, and reach the summit in as few strokes as you can.</p>
+      <div class="badge">
+        <span>⛳ Daily Hole</span>
+        <span class="n">New hole every day</span>
+      </div>
+      <button class="play" id="play">Play today's hole</button>
+      <svg class="hill" viewBox="0 0 1000 200" preserveAspectRatio="none">
+        <path d="M0 150 Q 250 120 500 130 Q 750 180 1000 100 V 200 H 0 Z" fill="#16a34a" />
+      </svg>
+      <div class="foot">Peak Putt · built on Devvit + Phaser</div>
+    </div>
+    <script>
+      // The splash is the inline post preview. Tapping play navigates the post
+      // to the interactive "game" entrypoint (a full webview).
+      document.getElementById('play').addEventListener('click', function () {
+        // Devvit renders the "game" entrypoint when the post is opened; this
+        // button is a visual affordance. If a navigation bridge exists, use it.
+        if (window.parent) {
+          window.parent.postMessage({ type: 'peakputt:play' }, '*');
+        }
+      });
+    </script>
+  </body>
+</html>

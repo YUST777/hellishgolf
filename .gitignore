@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vite/
+.devvit/
+.env
+.env.*
+
+# Local Codex/agent workspace material, not part of the app runtime.
+.agents/
+skills/
+skills-lock.json
+reference/
+
+# OS/editor noise.
+.DS_Store
+*.log
