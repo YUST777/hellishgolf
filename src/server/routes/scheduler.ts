@@ -1,6 +1,6 @@
-import { Hono } from 'hono';
-import { context, reddit } from '@devvit/web/server';
-import { getDailyInfo, setPostMap } from '../core/daily';
+import { Hono } from "hono";
+import { context, reddit } from "@devvit/web/server";
+import { getDailyInfo, setPostMap } from "../core/daily";
 
 export const scheduler = new Hono();
 
@@ -9,7 +9,7 @@ export const scheduler = new Hono();
  * current daily seed to it so it stays stable even after the calendar rolls.
  * This is the content flywheel: a new post every day keeps the game in feeds.
  */
-scheduler.post('/daily-hole', async (c) => {
+scheduler.post("/daily-hole", async (c) => {
   try {
     const daily = getDailyInfo();
     const post = await reddit.submitCustomPost({
@@ -25,5 +25,5 @@ scheduler.post('/daily-hole', async (c) => {
   } catch (error) {
     console.error(`daily-hole scheduler failed: ${error}`);
   }
-  return c.json({ status: 'ok' });
+  return c.json({ status: "ok" });
 });

@@ -18,19 +18,19 @@
 
 /** Named tile roles the game logic cares about. */
 export type TileRole =
-  | 'empty'
-  | 'ground'
-  | 'spawn'
-  | 'flag'
-  | 'finish'
-  | 'checkpoint'
-  | 'water'
-  | 'rough'
-  | 'ice'
-  | 'ramp-up'
-  | 'ramp-down'
-  | 'bird'
-  | 'decor';
+  | "empty"
+  | "ground"
+  | "spawn"
+  | "flag"
+  | "finish"
+  | "checkpoint"
+  | "water"
+  | "rough"
+  | "ice"
+  | "ramp-up"
+  | "ramp-down"
+  | "bird"
+  | "decor";
 
 // --- tileId constants (NOT gids) ------------------------------------------
 export const T_SPAWN = 209;
@@ -68,7 +68,7 @@ export const SOLID_TILE_IDS: number[] = Array.from(
     ...T_CHECKPOINT_GROUND,
     ...T_RAMP_UP,
     ...T_RAMP_DOWN,
-  ])
+  ]),
 );
 
 const roughSet = new Set(T_ROUGH);
@@ -90,17 +90,14 @@ export const T_DECOR = [10, 208];
 const decorSet = new Set(T_DECOR);
 
 export type RampShape =
-  | 'ground-up'
-  | 'ground-down'
-  | 'ceiling-up'
-  | 'ceiling-down';
+  "ground-up" | "ground-down" | "ceiling-up" | "ceiling-down";
 
 /** Exact triangular collider orientation for each ramp tileId. */
 export function rampShapeOfId(id: number): RampShape | null {
-  if (id === 172) return 'ground-up';
-  if (id === 173) return 'ground-down';
-  if (id === 169) return 'ceiling-up';
-  if (id === 202) return 'ceiling-down';
+  if (id === 172) return "ground-up";
+  if (id === 173) return "ground-down";
+  if (id === 169) return "ceiling-up";
+  if (id === 202) return "ceiling-down";
   return null;
 }
 
@@ -132,27 +129,27 @@ export function cleanGid(raw: number): number {
 
 /** Classify a bare tileId (gid - 1) into a gameplay role. */
 export function roleOfId(id: number): TileRole {
-  if (id < 0) return 'empty';
-  if (id === T_SPAWN) return 'spawn';
-  if (isFlagId(id)) return 'flag';
-  if (finishGroundSet.has(id)) return 'finish';
-  if (checkpointGroundSet.has(id)) return 'checkpoint';
-  if (id === T_WATER) return 'water';
-  if (roughSet.has(id)) return 'rough';
-  if (id === T_ICE) return 'ice';
-  if (rampUpSet.has(id)) return 'ramp-up';
-  if (rampDownSet.has(id)) return 'ramp-down';
-  if (birdSet.has(id)) return 'bird';
-  if (decorSet.has(id)) return 'decor';
+  if (id < 0) return "empty";
+  if (id === T_SPAWN) return "spawn";
+  if (isFlagId(id)) return "flag";
+  if (finishGroundSet.has(id)) return "finish";
+  if (checkpointGroundSet.has(id)) return "checkpoint";
+  if (id === T_WATER) return "water";
+  if (roughSet.has(id)) return "rough";
+  if (id === T_ICE) return "ice";
+  if (rampUpSet.has(id)) return "ramp-up";
+  if (rampDownSet.has(id)) return "ramp-down";
+  if (birdSet.has(id)) return "bird";
+  if (decorSet.has(id)) return "decor";
   // Unknown non-empty tiles fall back to solid so real walls (whose exact ids
   // aren't all enumerated) keep blocking the ball.
-  return 'ground';
+  return "ground";
 }
 
 /** Classify a raw layer value (gid, may carry flip flags) into a role. */
 export function roleOfGid(rawGid: number): TileRole {
   const gid = cleanGid(rawGid);
-  if (gid <= 0) return 'empty';
+  if (gid <= 0) return "empty";
   return roleOfId(gid - 1); // firstgid = 1
 }
 
@@ -162,12 +159,12 @@ export function isSolidGid(gid: number): boolean {
   if (isFlagId(id)) return false;
   const r = roleOfGid(gid);
   return (
-    r === 'ground' ||
-    r === 'ice' ||
-    r === 'ramp-up' ||
-    r === 'ramp-down' ||
-    r === 'finish' ||
-    r === 'checkpoint'
+    r === "ground" ||
+    r === "ice" ||
+    r === "ramp-up" ||
+    r === "ramp-down" ||
+    r === "finish" ||
+    r === "checkpoint"
   );
 }
 
@@ -175,7 +172,10 @@ export function isSolidGid(gid: number): boolean {
 export const SOLID_GIDS: number[] = SOLID_TILE_IDS.map((id) => id + 1);
 
 /** Set of tileIds (NOT gids) that count as the finish (flag + ground). */
-export const finishGidSet = new Set<number>([T_FINISH_FLAG, ...T_FINISH_GROUND]);
+export const finishGidSet = new Set<number>([
+  T_FINISH_FLAG,
+  ...T_FINISH_GROUND,
+]);
 
 /** The finish flag tileId (NOT gid). */
 export const finishFlagGid = T_FINISH_FLAG;

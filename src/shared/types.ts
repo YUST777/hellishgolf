@@ -5,13 +5,13 @@
 
 /** A single obstacle/feature placed in a hole. */
 export type LevelFeatureType =
-  | 'wall'
-  | 'ramp-left'
-  | 'ramp-right'
-  | 'bouncer'
-  | 'sand'
-  | 'hazard'
-  | 'checkpoint';
+  | "wall"
+  | "ramp-left"
+  | "ramp-right"
+  | "bouncer"
+  | "sand"
+  | "hazard"
+  | "checkpoint";
 
 export interface LevelFeature {
   type: LevelFeatureType;
@@ -105,7 +105,7 @@ interface ReplayBaseMove {
 
 /** A single shot in a completed run, enough to replay the ball launches. */
 export interface ReplayShotMove extends ReplayBaseMove {
-  type: 'shot';
+  type: "shot";
   /** 1-based shot number. */
   shot: number;
   /** Drag vector in world pixels used to aim the shot. */
@@ -120,8 +120,8 @@ export interface ReplayShotMove extends ReplayBaseMove {
 
 /** A powerup action in a completed run. */
 export interface ReplayPowerupMove extends ReplayBaseMove {
-  type: 'powerup';
-  powerup: 'trajectory' | 'sticky' | 'checkpoint';
+  type: "powerup";
+  powerup: "trajectory" | "sticky" | "checkpoint";
   targetX?: number;
   targetY?: number;
 }

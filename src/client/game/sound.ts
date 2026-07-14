@@ -16,46 +16,46 @@
  *   Ambient    ambient_birds           (background loop)
  */
 
-const BASE = 'game/audio';
-const MUTE_STORAGE_KEY = 'khg_muted';
+const BASE = "game/audio";
+const MUTE_STORAGE_KEY = "khg_muted";
 
 export type Sfx =
-  | 'BallHit'
-  | 'BallBounce'
-  | 'Splash'
-  | 'Chime'
-  | 'Claps'
-  | 'Back'
-  | 'Leaves'
-  | 'Squawk'
-  | 'Ambient'
-  | 'LavaDrop';
+  | "BallHit"
+  | "BallBounce"
+  | "Splash"
+  | "Chime"
+  | "Claps"
+  | "Back"
+  | "Leaves"
+  | "Squawk"
+  | "Ambient"
+  | "LavaDrop";
 
 const FILES: Record<Sfx, string> = {
-  BallHit: 'impactPlate_light_003',
-  BallBounce: 'footstep_wood_003',
-  Splash: 'rock_splash',
-  Chime: 'loading_chime',
-  Claps: 'slowclap',
-  Back: 'click_002',
-  Leaves: 'leaves',
-  Squawk: 'squawk',
-  Ambient: 'ambient_birds',
-  LavaDrop: 'golf_drop_lava',
+  BallHit: "impactPlate_light_003",
+  BallBounce: "footstep_wood_003",
+  Splash: "rock_splash",
+  Chime: "loading_chime",
+  Claps: "slowclap",
+  Back: "click_002",
+  Leaves: "leaves",
+  Squawk: "squawk",
+  Ambient: "ambient_birds",
+  LavaDrop: "golf_drop_lava",
 };
 
 /** Sounds that only ship as .mp3 (no .ogg variant). */
-const MP3_ONLY = new Set<Sfx>(['LavaDrop']);
+const MP3_ONLY = new Set<Sfx>(["LavaDrop"]);
 
 /** Pick the audio type the browser can play (ogg preferred, mp3 fallback). */
-function pickExt(): 'ogg' | 'mp3' {
-  const a = document.createElement('audio');
-  if (a.canPlayType('audio/ogg; codecs="vorbis"')) return 'ogg';
-  return 'mp3';
+function pickExt(): "ogg" | "mp3" {
+  const a = document.createElement("audio");
+  if (a.canPlayType('audio/ogg; codecs="vorbis"')) return "ogg";
+  return "mp3";
 }
 
 class SoundManager {
-  private ext: 'ogg' | 'mp3' = 'mp3';
+  private ext: "ogg" | "mp3" = "mp3";
   private pools = new Map<Sfx, HTMLAudioElement[]>();
   private ambient: HTMLAudioElement | null = null;
   private muted = false;
@@ -64,15 +64,15 @@ class SoundManager {
   init() {
     if (this.ready) return;
     this.ext = pickExt();
-    this.muted = localStorage.getItem(MUTE_STORAGE_KEY) === 'true';
+    this.muted = localStorage.getItem(MUTE_STORAGE_KEY) === "true";
     // Build a tiny pool per SFX so rapid repeats (bounces) can overlap.
     (Object.keys(FILES) as Sfx[]).forEach((key) => {
-      if (key === 'Ambient') return;
-      const ext = MP3_ONLY.has(key) ? 'mp3' : this.ext;
+      if (key === "Ambient") return;
+      const ext = MP3_ONLY.has(key) ? "mp3" : this.ext;
       const pool: HTMLAudioElement[] = [];
       for (let i = 0; i < 4; i++) {
         const el = new Audio(`${BASE}/${FILES[key]}.${ext}`);
-        el.preload = 'auto';
+        el.preload = "auto";
         pool.push(el);
       }
       this.pools.set(key, pool);

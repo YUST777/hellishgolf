@@ -1,9 +1,9 @@
-export type PowerupKind = 'trajectory' | 'sticky' | 'checkpoint';
+export type PowerupKind = "trajectory" | "sticky" | "checkpoint";
 
 export const POWERUP_ORDER: readonly PowerupKind[] = [
-  'trajectory',
-  'sticky',
-  'checkpoint',
+  "trajectory",
+  "sticky",
+  "checkpoint",
 ];
 
 export const POWERUP_PRICES: Record<PowerupKind, number> = {
@@ -13,12 +13,12 @@ export const POWERUP_PRICES: Record<PowerupKind, number> = {
 };
 
 export const POWERUP_NAMES: Record<PowerupKind, string> = {
-  trajectory: 'Trajectory',
-  sticky: 'Sticky Slime',
-  checkpoint: 'Checkpoint',
+  trajectory: "Trajectory",
+  sticky: "Sticky Slime",
+  checkpoint: "Checkpoint",
 };
 
-export type BallSkinId = 'classic' | 'ember' | 'slime' | 'gold';
+export type BallSkinId = "classic" | "ember" | "slime" | "gold";
 
 export interface BallSkinDefinition {
   id: BallSkinId;
@@ -30,12 +30,12 @@ export interface BallSkinDefinition {
   outline: number;
 }
 
-export const DEFAULT_BALL_SKIN: BallSkinId = 'classic';
+export const DEFAULT_BALL_SKIN: BallSkinId = "classic";
 
 export const BALL_SKINS: readonly BallSkinDefinition[] = [
   {
-    id: 'classic',
-    name: 'Classic',
+    id: "classic",
+    name: "Classic",
     price: 0,
     body: 0xffffff,
     highlight: 0xfff4e5,
@@ -43,8 +43,8 @@ export const BALL_SKINS: readonly BallSkinDefinition[] = [
     outline: 0x1a1a1a,
   },
   {
-    id: 'ember',
-    name: 'Ember',
+    id: "ember",
+    name: "Ember",
     price: 18,
     body: 0xff6b1a,
     highlight: 0xfff1a6,
@@ -52,8 +52,8 @@ export const BALL_SKINS: readonly BallSkinDefinition[] = [
     outline: 0x3b1206,
   },
   {
-    id: 'slime',
-    name: 'Slime',
+    id: "slime",
+    name: "Slime",
     price: 22,
     body: 0x8fff95,
     highlight: 0xe7ffe7,
@@ -61,8 +61,8 @@ export const BALL_SKINS: readonly BallSkinDefinition[] = [
     outline: 0x052e16,
   },
   {
-    id: 'gold',
-    name: 'Gold',
+    id: "gold",
+    name: "Gold",
     price: 35,
     body: 0xffd65a,
     highlight: 0xfff7c2,
@@ -85,7 +85,7 @@ export interface PowerupState {
   collected: Record<string, string[]>;
 }
 
-const STORAGE_KEY = 'khg_powerups_v1';
+const STORAGE_KEY = "khg_powerups_v1";
 
 export function coinCollectionKey(dateKey: string, mapId: number): string {
   return `${dateKey}:${mapId}`;
@@ -100,7 +100,7 @@ function emptyInventory(): PowerupInventory {
 }
 
 function normalizeInventory(value: unknown): PowerupInventory {
-  const raw = value && typeof value === 'object' ? value : {};
+  const raw = value && typeof value === "object" ? value : {};
   const rec = raw as Record<string, unknown>;
   return {
     trajectory: Math.max(0, Math.floor(Number(rec.trajectory) || 0)),
@@ -114,15 +114,19 @@ function isBallSkinId(value: unknown): value is BallSkinId {
 }
 
 function normalizeSkins(value: unknown): BallSkinInventory {
-  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const raw =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
   const ownedRaw = Array.isArray(raw.owned) ? raw.owned : [];
   const owned = new Set<BallSkinId>([DEFAULT_BALL_SKIN]);
   for (const id of ownedRaw) {
     if (isBallSkinId(id)) owned.add(id);
   }
-  const equipped = isBallSkinId(raw.equipped) && owned.has(raw.equipped)
-    ? raw.equipped
-    : DEFAULT_BALL_SKIN;
+  const equipped =
+    isBallSkinId(raw.equipped) && owned.has(raw.equipped)
+      ? raw.equipped
+      : DEFAULT_BALL_SKIN;
   return { owned: [...owned], equipped };
 }
 
@@ -132,7 +136,7 @@ export function getBallSkin(id: unknown): BallSkinDefinition {
 
 export function loadPowerupState(): PowerupState {
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') as {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as {
       coins?: unknown;
       inventory?: unknown;
       skins?: unknown;
@@ -143,7 +147,7 @@ export function loadPowerupState(): PowerupState {
       inventory: normalizeInventory(raw.inventory),
       skins: normalizeSkins(raw.skins),
       collected:
-        raw.collected && typeof raw.collected === 'object'
+        raw.collected && typeof raw.collected === "object"
           ? (raw.collected as Record<string, string[]>)
           : {},
     };
@@ -164,7 +168,7 @@ export function savePowerupState(state: PowerupState): void {
 export function collectedCoinIds(
   state: PowerupState,
   dateKey: string,
-  mapId: number
+  mapId: number,
 ): string[] {
   const value = state.collected[coinCollectionKey(dateKey, mapId)];
   return Array.isArray(value) ? value : [];
@@ -174,7 +178,7 @@ export function collectCoin(
   state: PowerupState,
   dateKey: string,
   mapId: number,
-  coinId: string
+  coinId: string,
 ): boolean {
   const key = coinCollectionKey(dateKey, mapId);
   const ids = new Set(collectedCoinIds(state, dateKey, mapId));
@@ -220,7 +224,10 @@ export function equipSkin(state: PowerupState, skinId: BallSkinId): boolean {
   return true;
 }
 
-export function consumePowerup(state: PowerupState, kind: PowerupKind): boolean {
+export function consumePowerup(
+  state: PowerupState,
+  kind: PowerupKind,
+): boolean {
   if (state.inventory[kind] <= 0) return false;
   state.inventory[kind] -= 1;
   savePowerupState(state);

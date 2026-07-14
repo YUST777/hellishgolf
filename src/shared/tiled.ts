@@ -10,7 +10,7 @@ import {
   finishGidSet,
   finishFlagGid,
   checkpointFlagGid,
-} from './tiles';
+} from "./tiles";
 
 /** Tiled sets these high bits for flipped/rotated tiles; mask them off. */
 const FLIP_MASK = 0x1fffffff;
@@ -66,7 +66,7 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
   // "terrain" layer with a data array). Match by the presence of a numeric
   // data array so those holes aren't parsed as empty.
   const tileLayer = json.layers.find(
-    (l) => Array.isArray(l.data) && l.data.length > 0
+    (l) => Array.isArray(l.data) && l.data.length > 0,
   );
   const raw = tileLayer?.data ?? [];
   const gids = raw.map((v) => v & FLIP_MASK);
@@ -97,8 +97,7 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
     const avgCol = Math.round(top.reduce((s, c) => s + c.col, 0) / top.length);
     return { col: avgCol, row: minRow };
   };
-  const finish: RuntimeCell =
-    anchorFrom(finishFlagCells) ??
+  const finish: RuntimeCell = anchorFrom(finishFlagCells) ??
     anchorFrom(finishGroundCells) ?? { col: Math.floor(cols / 2), row: 1 };
 
   const spawn = deriveSpawn(gids, cols, rows, finish);
@@ -119,7 +118,7 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
 
 function deriveCheckpointOrder(
   json: TiledMapJson,
-  checkpoints: RuntimeCell[]
+  checkpoints: RuntimeCell[],
 ): RuntimeCell[] {
   const order = json.metadata?.checkpointOrder;
   if (Array.isArray(order) && order.length > 0) {
@@ -143,7 +142,7 @@ function deriveSpawn(
   gids: number[],
   cols: number,
   rows: number,
-  finish: RuntimeCell
+  finish: RuntimeCell,
 ): RuntimeCell {
   const candidates: RuntimeCell[] = [];
   for (let row = 0; row < rows - 1; row++) {
@@ -154,10 +153,10 @@ function deriveSpawn(
       if (below === 0) continue; // must have something beneath
       const belowRole = roleOfGid(below);
       const isFloor =
-        belowRole === 'ground' ||
-        belowRole === 'ice' ||
-        belowRole === 'ramp-up' ||
-        belowRole === 'ramp-down';
+        belowRole === "ground" ||
+        belowRole === "ice" ||
+        belowRole === "ramp-up" ||
+        belowRole === "ramp-down";
       if (!isFloor) continue;
       candidates.push({ col, row });
     }

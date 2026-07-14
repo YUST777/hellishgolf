@@ -3,7 +3,7 @@
 /** Native atlas frame size and rendered world tile size. */
 export const SOURCE_TILE = 16;
 export const TILE = 32;
-export const TILESET_URL = 'game/tilemap/tileset.png';
+export const TILESET_URL = "game/tilemap/tileset.png";
 export const DIRT_FRAME = 34;
 
 /** The original renders Rapier metres at 50 screen pixels per metre. */
@@ -42,12 +42,12 @@ export const POWER_EXP = 1.2;
 export const BALL_VISUAL_RADIUS = 18;
 
 /** The reference uses three discrete, persisted zoom choices. */
-export const ZOOM_STORAGE_KEY = 'khg_default_zoom';
+export const ZOOM_STORAGE_KEY = "khg_default_zoom";
 export const ZOOM_LEVELS = [1, 0.5, 0.35] as const;
 export const DEFAULT_ZOOM = 1;
 
 /** Kinda Infuriating Mode: disables checkpoints for a harder run. */
-export const INFURIATING_STORAGE_KEY = 'khg_infuriating';
+export const INFURIATING_STORAGE_KEY = "khg_infuriating";
 
 /** The daily hole rolls over at 05:00 UTC (matches the devvit scheduler cron). */
 export const DAILY_RESET_HOUR_UTC = 5;

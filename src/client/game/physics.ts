@@ -3,7 +3,7 @@
  * load the same engine (WASM) once and share the module singleton. `ensureRapier`
  * must be awaited before any physics world is created.
  */
-import RAPIER from '@dimforge/rapier2d-compat';
+import RAPIER from "@dimforge/rapier2d-compat";
 
 let ready: Promise<typeof RAPIER> | null = null;
 

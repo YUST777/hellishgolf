@@ -1,17 +1,17 @@
-import { redis } from '@devvit/web/server';
+import { redis } from "@devvit/web/server";
 import type {
   LeaderboardEntry,
   LeaderboardResponse,
   ReplayMove,
   SubmitScoreResponse,
-} from '../../shared/types';
+} from "../../shared/types";
 import {
   getSupabaseBest,
   getSupabaseLeaderboard,
   isSupabaseConfigured,
   sanitizeReplayMoves,
   submitSupabaseScore,
-} from './supabase';
+} from "./supabase";
 
 /**
  * Redis key design (siloed per subreddit install):
@@ -22,17 +22,57 @@ import {
  */
 
 const lbKey = (dateKey: string, postId: string) => `lb:${dateKey}:${postId}`;
-const timeKey = (dateKey: string, postId: string) => `time:${dateKey}:${postId}`;
+const timeKey = (dateKey: string, postId: string) =>
+  `time:${dateKey}:${postId}`;
 const streakKey = (username: string) => `streak:${username}`;
 const streakLastKey = (username: string) => `streak:last:${username}`;
 
+type RankedRedisEntry = LeaderboardEntry & { timeMs: number };
+
 function prevDateKey(dateKey: string): string {
-  const [y, m, d] = dateKey.split('-').map(Number);
+  const [y, m, d] = dateKey.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() - 1);
-  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(
-    dt.getUTCDate()
-  ).padStart(2, '0')}`;
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    dt.getUTCDate(),
+  ).padStart(2, "0")}`;
+}
+
+function parseStoredTime(value: string | null | undefined): number {
+  if (!value) return Number.MAX_SAFE_INTEGER;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : Number.MAX_SAFE_INTEGER;
+}
+
+async function redisRankings(
+  dateKey: string,
+  postId: string,
+): Promise<RankedRedisEntry[]> {
+  const key = lbKey(dateKey, postId);
+  const total = await redis.zCard(key);
+  if (total <= 0) return [];
+
+  const [scores, times] = await Promise.all([
+    redis.zRange(key, 0, total - 1, { by: "rank" }),
+    redis.hGetAll(timeKey(dateKey, postId)),
+  ]);
+
+  return scores
+    .map((entry) => ({
+      username: entry.member,
+      strokes: entry.score,
+      timeMs: parseStoredTime(times[entry.member]),
+      rank: 0,
+    }))
+    .sort(
+      (a, b) =>
+        a.strokes - b.strokes ||
+        a.timeMs - b.timeMs ||
+        a.username.localeCompare(b.username),
+    )
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 
 /** Read the player's current streak count. */
@@ -45,18 +85,18 @@ export async function getStreak(username: string): Promise<number> {
 export async function getBest(
   dateKey: string,
   postId: string,
-  username: string
+  username: string,
 ): Promise<number | null> {
   if (await isSupabaseConfigured()) {
     try {
       return await getSupabaseBest(dateKey, postId, username);
     } catch (error) {
-      console.error('Supabase getBest failed; falling back to Redis:', error);
+      console.error("Supabase getBest failed; falling back to Redis:", error);
     }
   }
 
   const score = await redis.zScore(lbKey(dateKey, postId), username);
-  return typeof score === 'number' ? score : null;
+  return typeof score === "number" ? score : null;
 }
 
 /**
@@ -108,20 +148,25 @@ export async function submitScore(params: {
         moves,
       });
     } catch (error) {
-      console.error('Supabase submitScore failed; falling back to Redis:', error);
+      console.error(
+        "Supabase submitScore failed; falling back to Redis:",
+        error,
+      );
     }
   }
 
   const key = lbKey(dateKey, postId);
 
   const existing = await redis.zScore(key, username);
-  const hadPrevious = typeof existing === 'number';
+  const hadPrevious = typeof existing === "number";
   const existingTimeRaw = hadPrevious
     ? await redis.hGet(timeKey(dateKey, postId), username)
     : null;
-  const existingTime = existingTimeRaw ? parseInt(existingTimeRaw, 10) : Infinity;
+  const existingTime = parseStoredTime(existingTimeRaw);
   const improved =
-    !hadPrevious || strokes < existing! || (strokes === existing && timeMs < existingTime);
+    !hadPrevious ||
+    strokes < existing! ||
+    (strokes === existing && timeMs < existingTime);
 
   if (improved) {
     await redis.zAdd(key, { member: username, score: strokes });
@@ -129,14 +174,14 @@ export async function submitScore(params: {
   }
 
   const bestToday = improved ? strokes : existing!;
-  const rank = (await redis.zRank(key, username)) ?? 0;
-  const totalPlayers = await redis.zCard(key);
+  const rankings = await redisRankings(dateKey, postId);
+  const you = rankings.find((entry) => entry.username === username);
 
   return {
     ok: true,
     bestToday,
-    rank: rank + 1, // 1-based for display
-    totalPlayers,
+    rank: you?.rank ?? rankings.length,
+    totalPlayers: rankings.length,
     streak,
     improved,
   };
@@ -155,29 +200,24 @@ export async function leaderboard(params: {
     try {
       return await getSupabaseLeaderboard({ dateKey, postId, username, limit });
     } catch (error) {
-      console.error('Supabase leaderboard failed; falling back to Redis:', error);
+      console.error(
+        "Supabase leaderboard failed; falling back to Redis:",
+        error,
+      );
     }
   }
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+  const rankings = await redisRankings(dateKey, postId);
+  const totalPlayers = rankings.length;
 
-  const key = lbKey(dateKey, postId);
-
-  const totalPlayers = await redis.zCard(key);
-  // Lowest strokes first == ranks 0..limit-1 by rank.
-  const top = await redis.zRange(key, 0, limit - 1, { by: 'rank' });
-
-  const entries: LeaderboardEntry[] = top.map((e, i) => ({
-    username: e.member,
-    strokes: e.score,
-    rank: i + 1,
-  }));
+  const entries: LeaderboardEntry[] = rankings
+    .slice(0, safeLimit)
+    .map(({ username, strokes, rank }) => ({ username, strokes, rank }));
 
   let you: LeaderboardEntry | null = null;
   if (username) {
-    const score = await redis.zScore(key, username);
-    if (typeof score === 'number') {
-      const rank = (await redis.zRank(key, username)) ?? 0;
-      you = { username, strokes: score, rank: rank + 1 };
-    }
+    const entry = rankings.find((row) => row.username === username);
+    if (entry) you = { username, strokes: entry.strokes, rank: entry.rank };
   }
 
   return { entries, totalPlayers, you };

@@ -1,13 +1,13 @@
-import 'dotenv/config';
-import { randomUUID } from 'node:crypto';
-import { settings } from '@devvit/settings';
-import postgres from 'postgres';
+import "dotenv/config";
+import { randomUUID } from "node:crypto";
+import { settings } from "@devvit/settings";
+import postgres from "postgres";
 import type {
   LeaderboardEntry,
   LeaderboardResponse,
   ReplayMove,
   SubmitScoreResponse,
-} from '../../shared/types';
+} from "../../shared/types";
 
 const MAX_REPLAY_MOVES = 200;
 const MAX_COORD = 200_000;
@@ -27,20 +27,21 @@ let schemaReady: Promise<void> | null = null;
 let devvitSettings: Promise<DbValues> | null = null;
 
 const DB_KEYS = [
-  'DATABASE_URL',
-  'DB_HOST',
-  'DB_PORT',
-  'DB_NAME',
-  'DB_USER',
-  'DB_PASSWORD',
-  'DB_SSL',
+  "DATABASE_URL",
+  "DB_HOST",
+  "DB_PORT",
+  "DB_NAME",
+  "DB_USER",
+  "DB_PASSWORD",
+  "DB_SSL",
 ] as const;
 
 type DbKey = (typeof DB_KEYS)[number];
 type DbValues = Partial<Record<DbKey, string>>;
 
 function clean(value: unknown): string | undefined {
-  const text = typeof value === 'string' ? value : value == null ? '' : String(value);
+  const text =
+    typeof value === "string" ? value : value == null ? "" : String(value);
   const trimmed = text.trim();
   return trimmed ? trimmed : undefined;
 }
@@ -79,21 +80,24 @@ function connectionString(values: DbValues): string | null {
   const password = values.DB_PASSWORD;
   if (!host || !database || !user || !password) return null;
 
-  const port = values.DB_PORT ?? '5432';
+  const port = values.DB_PORT ?? "5432";
   const auth = `${encodeURIComponent(user)}:${encodeURIComponent(password)}`;
-  const params = values.DB_SSL === 'disable' ? '' : '?sslmode=require';
+  const params = values.DB_SSL === "disable" ? "" : "?sslmode=require";
   return `postgresql://${auth}@${host}:${port}/${database}${params}`;
 }
 
 function sslEnabled(url: string, values: DbValues): boolean {
   const raw = values.DB_SSL?.toLowerCase();
-  if (raw && ['0', 'false', 'off', 'no', 'disable', 'disabled'].includes(raw)) {
+  if (raw && ["0", "false", "off", "no", "disable", "disabled"].includes(raw)) {
     return false;
   }
-  return !url.includes('sslmode=disable');
+  return !url.includes("sslmode=disable");
 }
 
-async function connectionConfig(): Promise<{ url: string; ssl: boolean } | null> {
+async function connectionConfig(): Promise<{
+  url: string;
+  ssl: boolean;
+} | null> {
   const local = processValues();
   const localUrl = connectionString(local);
   if (localUrl) return { url: localUrl, ssl: sslEnabled(localUrl, local) };
@@ -111,14 +115,14 @@ async function sql(): Promise<postgres.Sql | null> {
   if (!config) return null;
 
   if (!sqlClient) {
-    const options: postgres.Options<{}> = {
+    const options: postgres.Options<Record<string, never>> = {
       max: 3,
       idle_timeout: 20,
       connect_timeout: 10,
       prepare: false,
       onnotice: () => undefined,
     };
-    if (config.ssl) options.ssl = 'require';
+    if (config.ssl) options.ssl = "require";
     sqlClient = postgres(config.url, options);
   }
   return sqlClient;
@@ -193,7 +197,7 @@ export async function ensureSupabaseSchema(): Promise<boolean> {
 }
 
 function clampNumber(value: unknown, min: number, max: number): number | null {
-  const n = typeof value === 'number' ? value : Number(value);
+  const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return null;
   return Math.max(min, Math.min(max, n));
 }
@@ -203,7 +207,9 @@ function rounded(value: number, places = 3): number {
   return Math.round(value * scale) / scale;
 }
 
-function sanitizeBaseMove(move: Record<string, unknown>): Pick<ReplayMove, 't' | 'x' | 'y'> | null {
+function sanitizeBaseMove(
+  move: Record<string, unknown>,
+): Pick<ReplayMove, "t" | "x" | "y"> | null {
   const t = clampNumber(move.t, 0, 86_400_000);
   const x = clampNumber(move.x, -MAX_COORD, MAX_COORD);
   const y = clampNumber(move.y, -MAX_COORD, MAX_COORD);
@@ -220,18 +226,22 @@ export function sanitizeReplayMoves(value: unknown): ReplayMove[] {
 
   const moves: ReplayMove[] = [];
   for (const raw of value.slice(0, MAX_REPLAY_MOVES)) {
-    if (!raw || typeof raw !== 'object') continue;
+    if (!raw || typeof raw !== "object") continue;
     const move = raw as Record<string, unknown>;
     const base = sanitizeBaseMove(move);
     if (!base) continue;
 
-    if (move.type === 'powerup') {
+    if (move.type === "powerup") {
       const powerup = move.powerup;
-      if (powerup !== 'trajectory' && powerup !== 'sticky' && powerup !== 'checkpoint') {
+      if (
+        powerup !== "trajectory" &&
+        powerup !== "sticky" &&
+        powerup !== "checkpoint"
+      ) {
         continue;
       }
       const sanitized: ReplayMove = {
-        type: 'powerup',
+        type: "powerup",
         powerup,
         ...base,
       };
@@ -262,7 +272,7 @@ export function sanitizeReplayMoves(value: unknown): ReplayMove[] {
     }
 
     moves.push({
-      type: 'shot',
+      type: "shot",
       shot: Math.floor(shot),
       ...base,
       dragX: rounded(dragX),
@@ -277,7 +287,7 @@ export function sanitizeReplayMoves(value: unknown): ReplayMove[] {
 
 async function readySql(): Promise<postgres.Sql> {
   const db = await sql();
-  if (!db) throw new Error('Supabase database env is not configured');
+  if (!db) throw new Error("Supabase database env is not configured");
   await ensureSupabaseSchema();
   return db;
 }
@@ -285,7 +295,7 @@ async function readySql(): Promise<postgres.Sql> {
 export async function getSupabaseBest(
   dateKey: string,
   postId: string,
-  username: string
+  username: string,
 ): Promise<number | null> {
   const db = await readySql();
   const rows = await db<BestRow[]>`
@@ -383,7 +393,10 @@ export async function submitSupabaseScore(params: {
       LIMIT 1
     `;
 
-    const best = bestRows[0] ?? { strokes: params.strokes, time_ms: params.timeMs };
+    const best = bestRows[0] ?? {
+      strokes: params.strokes,
+      time_ms: params.timeMs,
+    };
 
     const totalRows = await tx<CountRow[]>`
       SELECT count(*)::int AS count

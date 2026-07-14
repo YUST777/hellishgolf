@@ -1,0 +1,10 @@
+dist
+node_modules
+.agents
+skills
+reference
+.playwright-cli
+output
+public/game/audio
+public/game/tilemap
+.env

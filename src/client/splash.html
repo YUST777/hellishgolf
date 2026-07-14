@@ -2,51 +2,145 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Peak Putt</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2324272b'/%3E%3Ccircle cx='30' cy='34' r='15' fill='%23f7f7f0'/%3E%3Cpath d='M19 26h22' stroke='%23d8b56d' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
     <style>
-      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-      html, body {
-        margin: 0; padding: 0; width: 100%; height: 100%;
-        overflow: hidden; user-select: none;
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        user-select: none;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
         background: linear-gradient(to bottom right, #15171a, #2d333a);
         color: #fff;
       }
       .splash {
-        position: fixed; inset: 0;
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        text-align: center; padding: 1.5rem;
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 1.5rem;
         background:
-          radial-gradient(circle at 50% 38%, rgba(216, 181, 109, 0.12), transparent 19rem),
+          radial-gradient(
+            circle at 50% 38%,
+            rgba(216, 181, 109, 0.12),
+            transparent 19rem
+          ),
           linear-gradient(to bottom right, #15171a, #2d333a);
       }
-      .title { line-height: 0.95; margin-bottom: 0.5rem; }
-      .title .top { font-size: 42px; font-weight: 800; display: block; }
-      .title .bottom { font-size: 84px; font-weight: 800; color: #d8b56d; display: block; }
-      .sub { font-size: 15px; color: #d9d1c5; opacity: 0.95; margin: 0 0 1.5rem; max-width: 22rem; }
+      .title {
+        line-height: 0.95;
+        margin-bottom: 0.5rem;
+      }
+      .title .top {
+        font-size: 42px;
+        font-weight: 800;
+        display: block;
+      }
+      .title .bottom {
+        font-size: 84px;
+        font-weight: 800;
+        color: #d8b56d;
+        display: block;
+      }
+      .sub {
+        font-size: 15px;
+        color: #d9d1c5;
+        opacity: 0.95;
+        margin: 0 0 1.5rem;
+        max-width: 22rem;
+      }
       .badge {
-        display: inline-flex; gap: 10px; align-items: center;
-        border: 2px solid #4b5563; background: #24272b; color: #f4efe6;
-        border-radius: 10px; padding: 8px 14px; margin-bottom: 1.25rem;
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        border: 2px solid #4b5563;
+        background: #24272b;
+        color: #f4efe6;
+        border-radius: 10px;
+        padding: 8px 14px;
+        margin-bottom: 1.25rem;
         font-weight: 700;
-        box-shadow: 0 10px 24px rgba(0,0,0,0.2), inset 0 1px rgba(255,255,255,0.08);
+        box-shadow:
+          0 10px 24px rgba(0, 0, 0, 0.2),
+          inset 0 1px rgba(255, 255, 255, 0.08);
       }
-      .badge svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-      .badge-main { display: inline-flex; align-items: center; gap: 7px; }
-      .badge .n { color: #b7b0a4; font-size: 12px; font-weight: 500; display: block; }
+      .badge svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .badge-main {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .badge .n {
+        color: #b7b0a4;
+        font-size: 12px;
+        font-weight: 500;
+        display: block;
+      }
       .play {
-        font-size: 18px; font-weight: 800; color: #fff; cursor: pointer;
-        background: #047857; border: 2px solid #034d34; border-radius: 12px;
-        padding: 14px 28px; box-shadow: 0 4px 0 #034d34, 0 6px 8px rgba(0,0,0,0.25);
-        transition: transform 0.1s, box-shadow 0.1s;
+        font-size: 18px;
+        font-weight: 800;
+        color: #fff;
+        cursor: pointer;
+        background: #047857;
+        border: 2px solid #034d34;
+        border-radius: 12px;
+        padding: 14px 28px;
+        box-shadow:
+          0 4px 0 #034d34,
+          0 6px 8px rgba(0, 0, 0, 0.25);
+        transition:
+          transform 0.1s,
+          box-shadow 0.1s;
       }
-      .play:active { transform: translateY(3px); box-shadow: 0 1px 0 #034d34; }
+      .play:active {
+        transform: translateY(3px);
+        box-shadow: 0 1px 0 #034d34;
+      }
       .hill {
-        position: absolute; bottom: 0; left: 0; width: 100%; height: 120px; z-index: -1;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 120px;
+        z-index: -1;
       }
-      .foot { position: absolute; bottom: 10px; color: #b7b0a4; font-size: 11px; opacity: 0.75; }
+      .foot {
+        position: absolute;
+        bottom: 10px;
+        color: #b7b0a4;
+        font-size: 11px;
+        opacity: 0.75;
+      }
     </style>
   </head>
   <body>
@@ -55,7 +149,10 @@
         <span class="top">Peak</span>
         <span class="bottom">Putt</span>
       </div>
-      <p class="sub">A daily climb-the-hole golf game. Aim, launch, and reach the summit in as few strokes as you can.</p>
+      <p class="sub">
+        A daily climb-the-hole golf game. Aim, launch, and reach the summit in
+        as few strokes as you can.
+      </p>
       <div class="badge">
         <span class="badge-main">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -69,18 +166,21 @@
       </div>
       <button class="play" id="play">Play today's hole</button>
       <svg class="hill" viewBox="0 0 1000 200" preserveAspectRatio="none">
-        <path d="M0 150 Q 250 120 500 130 Q 750 180 1000 100 V 200 H 0 Z" fill="#3f4a42" />
+        <path
+          d="M0 150 Q 250 120 500 130 Q 750 180 1000 100 V 200 H 0 Z"
+          fill="#3f4a42"
+        />
       </svg>
       <div class="foot">Peak Putt · built on Devvit + Phaser</div>
     </div>
     <script>
       // The splash is the inline post preview. Tapping play navigates the post
       // to the interactive "game" entrypoint (a full webview).
-      document.getElementById('play').addEventListener('click', function () {
+      document.getElementById("play").addEventListener("click", function () {
         // Devvit renders the "game" entrypoint when the post is opened; this
         // button is a visual affordance. If a navigation bridge exists, use it.
         if (window.parent) {
-          window.parent.postMessage({ type: 'peakputt:play' }, '*');
+          window.parent.postMessage({ type: "peakputt:play" }, "*");
         }
       });
     </script>

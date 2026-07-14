@@ -3,9 +3,9 @@ import type {
   LeaderboardResponse,
   SubmitScoreRequest,
   SubmitScoreResponse,
-} from '../../shared/types';
-import { seedFromDateKey } from '../../shared/level';
-import { pickMapId } from '../../shared/mapManifest';
+} from "../../shared/types";
+import { seedFromDateKey } from "../../shared/level";
+import { pickMapId } from "../../shared/mapManifest";
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -15,8 +15,8 @@ async function getJson<T>(url: string): Promise<T> {
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
@@ -29,23 +29,28 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 // client-side: pick the daily hole from the map pool by date, keep the best
 // score in localStorage, and show an empty leaderboard.
 
-const OFFLINE_BEST_KEY = 'khg_offline_best';
+const OFFLINE_BEST_KEY = "khg_offline_best";
 
 function todayKeyUTC(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 /** Deterministic day index so everyone sees the same hole on a given date. */
-function dailyMapId(dateKey: string): { mapId: number; holeNumber: number } {
+function dailyMapId(dateKey: string): {
+  mapId: number;
+  holeNumber: number;
+  seed: number;
+} {
   const epoch = Date.UTC(2025, 0, 1);
   const day = Math.floor((Date.parse(dateKey) - epoch) / 86_400_000);
-  return { mapId: pickMapId(seedFromDateKey(dateKey)), holeNumber: day + 1 };
+  const seed = seedFromDateKey(dateKey);
+  return { mapId: pickMapId(seed), holeNumber: day + 1, seed };
 }
 
 function offlineBest(dateKey: string): number | null {
   try {
-    const raw = JSON.parse(localStorage.getItem(OFFLINE_BEST_KEY) || '{}');
-    return typeof raw[dateKey] === 'number' ? raw[dateKey] : null;
+    const raw = JSON.parse(localStorage.getItem(OFFLINE_BEST_KEY) || "{}");
+    return typeof raw[dateKey] === "number" ? raw[dateKey] : null;
   } catch {
     return null;
   }
@@ -55,7 +60,7 @@ function setOfflineBest(dateKey: string, strokes: number): number {
   const prev = offlineBest(dateKey);
   const best = prev == null ? strokes : Math.min(prev, strokes);
   try {
-    const raw = JSON.parse(localStorage.getItem(OFFLINE_BEST_KEY) || '{}');
+    const raw = JSON.parse(localStorage.getItem(OFFLINE_BEST_KEY) || "{}");
     raw[dateKey] = best;
     localStorage.setItem(OFFLINE_BEST_KEY, JSON.stringify(raw));
   } catch {
@@ -68,11 +73,11 @@ let offlineMode = false;
 
 function offlineInit(): InitResponse {
   const dateKey = todayKeyUTC();
-  const { mapId, holeNumber } = dailyMapId(dateKey);
+  const { mapId, holeNumber, seed } = dailyMapId(dateKey);
   return {
-    postId: 'offline',
+    postId: "offline",
     username: null,
-    daily: { dateKey, holeNumber, seed: holeNumber, mapId },
+    daily: { dateKey, holeNumber, seed, mapId },
     bestToday: offlineBest(dateKey),
     streak: 0,
     mapId,
@@ -82,7 +87,7 @@ function offlineInit(): InitResponse {
 export const apiClient = {
   async init(): Promise<InitResponse> {
     try {
-      return await getJson<InitResponse>('/api/init');
+      return await getJson<InitResponse>("/api/init");
     } catch {
       offlineMode = true;
       return offlineInit();
@@ -92,26 +97,28 @@ export const apiClient = {
   async submitScore(payload: SubmitScoreRequest): Promise<SubmitScoreResponse> {
     if (!offlineMode) {
       try {
-        return await postJson<SubmitScoreResponse>('/api/score', payload);
+        return await postJson<SubmitScoreResponse>("/api/score", payload);
       } catch {
         offlineMode = true;
       }
     }
-    const best = setOfflineBest(todayKeyUTC(), payload.strokes);
+    const dateKey = todayKeyUTC();
+    const previous = offlineBest(dateKey);
+    const best = setOfflineBest(dateKey, payload.strokes);
     return {
       ok: true,
       bestToday: best,
       rank: 1,
       totalPlayers: 1,
       streak: 0,
-      improved: payload.strokes === best,
+      improved: previous == null || payload.strokes < previous,
     };
   },
 
   async leaderboard(): Promise<LeaderboardResponse> {
     if (!offlineMode) {
       try {
-        return await getJson<LeaderboardResponse>('/api/leaderboard');
+        return await getJson<LeaderboardResponse>("/api/leaderboard");
       } catch {
         offlineMode = true;
       }

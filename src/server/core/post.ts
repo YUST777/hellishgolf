@@ -1,5 +1,5 @@
-import { reddit } from '@devvit/web/server';
-import { getDailyInfo, setPostMap } from './daily';
+import { context, reddit } from "@devvit/web/server";
+import { getDailyInfo, normalizeMapId, setPostMap } from "./daily";
 
 /**
  * Create a new Peak Putt post. If a `seed` is provided (user-generated hole),
@@ -7,11 +7,15 @@ import { getDailyInfo, setPostMap } from './daily';
  */
 export async function createPost(opts?: { mapId?: number; title?: string }) {
   const daily = getDailyInfo();
-  const mapId = opts?.mapId ?? daily.mapId;
+  const mapId = normalizeMapId(opts?.mapId, daily.mapId);
   const title =
-    opts?.title ?? `Peak Putt \u2014 Hole #${daily.holeNumber} (${daily.dateKey})`;
+    opts?.title ??
+    `Peak Putt \u2014 Hole #${daily.holeNumber} (${daily.dateKey})`;
 
-  const post = await reddit.submitCustomPost({ title });
+  const post = await reddit.submitCustomPost({
+    title,
+    subredditName: context.subredditName,
+  });
 
   await setPostMap(post.id, mapId);
   return post;

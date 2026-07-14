@@ -11,6 +11,8 @@ dist/
 skills/
 skills-lock.json
 reference/
+.playwright-cli/
+output/
 
 # OS/editor noise.
 .DS_Store

@@ -7,14 +7,14 @@
 //
 // It is a dev-only convenience and is NOT part of the shipped app.
 
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { watch } from 'node:fs';
-import { extname, join, normalize } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createServer } from "node:http";
+import { readFile } from "node:fs/promises";
+import { watch } from "node:fs";
+import { extname, join, normalize } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const ROOT = normalize(join(__dirname, '..', 'dist', 'client'));
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const ROOT = normalize(join(__dirname, "..", "dist", "client"));
 const PORT = Number(process.env.PORT ?? 5173);
 
 // --- live reload -------------------------------------------------------------
@@ -41,8 +41,10 @@ function scheduleReload() {
   reloadTimer = setTimeout(() => {
     for (const res of reloadClients) {
       try {
-        res.write('event: reload\ndata: 1\n\n');
-      } catch {}
+        res.write("event: reload\ndata: 1\n\n");
+      } catch {
+        // Browser tab disconnected between scheduling and writing.
+      }
     }
   }, 150);
 }
@@ -60,8 +62,8 @@ function seedFromDateKey(dateKey) {
 function currentDateKey() {
   const shifted = new Date(Date.now() - 5 * 60 * 60 * 1000);
   const y = shifted.getUTCFullYear();
-  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
-  const d = String(shifted.getUTCDate()).padStart(2, '0');
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
@@ -78,38 +80,38 @@ const seed = seedFromDateKey(dateKey);
 const mapId = MAP_IDS[(seed >>> 0) % MAP_IDS.length];
 // Allow overriding the hole for testing: /?map=465
 function resolveMapId(url) {
-  const q = Number(url.searchParams.get('map'));
+  const q = Number(url.searchParams.get("map"));
   return MAP_IDS.includes(q) ? q : mapId;
 }
 
 // In-memory leaderboard for this preview session.
 const board = [
-  { username: 'sandtrap_sally', strokes: 6 },
-  { username: 'birdie_ben', strokes: 8 },
-  { username: 'bogey_bot', strokes: 11 },
+  { username: "sandtrap_sally", strokes: 6 },
+  { username: "birdie_ben", strokes: 8 },
+  { username: "bogey_bot", strokes: 11 },
 ];
 let you = null;
 let streak = 0;
 
 const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff2": "font/woff2",
 };
 
 function sendJson(res, status, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'content-length': Buffer.byteLength(body),
+    "content-type": "application/json; charset=utf-8",
+    "content-length": Buffer.byteLength(body),
   });
   res.end(body);
 }
@@ -126,7 +128,7 @@ async function readBody(req) {
   for await (const c of req) chunks.push(c);
   if (chunks.length === 0) return {};
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
     return {};
   }
@@ -135,10 +137,10 @@ async function readBody(req) {
 const server = createServer(async (req, res) => {
   let url;
   try {
-    url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
+    url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
   } catch {
-    res.writeHead(400, { 'content-type': 'text/plain' });
-    return res.end('Bad request');
+    res.writeHead(400, { "content-type": "text/plain" });
+    return res.end("Bad request");
   }
   let pathname;
   try {
@@ -148,11 +150,11 @@ const server = createServer(async (req, res) => {
   }
 
   // --- mocked API ------------------------------------------------------------
-  if (pathname === '/api/init') {
+  if (pathname === "/api/init") {
     const id = resolveMapId(url);
     return sendJson(res, 200, {
-      postId: 'preview_post',
-      username: 'you_the_dev',
+      postId: "preview_post",
+      username: "you_the_dev",
       daily: { dateKey, holeNumber: 42, seed, mapId: id },
       bestToday: you ? you.strokes : null,
       streak,
@@ -160,14 +162,14 @@ const server = createServer(async (req, res) => {
     });
   }
 
-  if (pathname === '/api/score' && req.method === 'POST') {
+  if (pathname === "/api/score" && req.method === "POST") {
     const body = await readBody(req);
     const strokes = Math.max(1, Math.floor(Number(body.strokes) || 1));
     const improved = !you || strokes < you.strokes;
-    if (improved) you = { username: 'you_the_dev', strokes };
+    if (improved) you = { username: "you_the_dev", strokes };
     streak = Math.max(streak, 1);
     const ranked = rankBoard();
-    const rank = ranked.findIndex((e) => e.username === 'you_the_dev') + 1;
+    const rank = ranked.findIndex((e) => e.username === "you_the_dev") + 1;
     return sendJson(res, 200, {
       ok: true,
       bestToday: you.strokes,
@@ -178,77 +180,79 @@ const server = createServer(async (req, res) => {
     });
   }
 
-  if (pathname === '/api/leaderboard') {
+  if (pathname === "/api/leaderboard") {
     const ranked = rankBoard().map((e, i) => ({ ...e, rank: i + 1 }));
     return sendJson(res, 200, {
       entries: ranked.slice(0, 10),
       totalPlayers: ranked.length,
       you: you
-        ? ranked.find((e) => e.username === 'you_the_dev') ?? null
+        ? (ranked.find((e) => e.username === "you_the_dev") ?? null)
         : null,
     });
   }
 
   // --- live reload (Server-Sent Events) --------------------------------------
-  if (pathname === '/__reload') {
+  if (pathname === "/__reload") {
     res.writeHead(200, {
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache',
-      connection: 'keep-alive',
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      connection: "keep-alive",
     });
-    res.write('retry: 500\n\n');
+    res.write("retry: 500\n\n");
     reloadClients.add(res);
-    req.on('close', () => reloadClients.delete(res));
+    req.on("close", () => reloadClients.delete(res));
     return;
   }
 
   // --- static files ----------------------------------------------------------
-  if (pathname === '/') pathname = '/game.html';
+  if (pathname === "/") pathname = "/game.html";
 
   const filePath = normalize(join(ROOT, pathname));
   if (!filePath.startsWith(ROOT)) {
     res.writeHead(403);
-    return res.end('Forbidden');
+    return res.end("Forbidden");
   }
 
   try {
     const data = await readFile(filePath);
-    const type = MIME[extname(filePath)] ?? 'application/octet-stream';
+    const type = MIME[extname(filePath)] ?? "application/octet-stream";
     // Inject the live-reload client into any served HTML.
-    if (type.startsWith('text/html')) {
-      const html = data.toString('utf8').replace(
-        '</body>',
-        `${LIVE_RELOAD_SNIPPET}</body>`
-      );
-      res.writeHead(200, { 'content-type': type });
+    if (type.startsWith("text/html")) {
+      const html = data
+        .toString("utf8")
+        .replace("</body>", `${LIVE_RELOAD_SNIPPET}</body>`);
+      res.writeHead(200, { "content-type": type });
       return res.end(html);
     }
-    res.writeHead(200, { 'content-type': type });
+    res.writeHead(200, { "content-type": type });
     res.end(data);
   } catch {
-    res.writeHead(404, { 'content-type': 'text/plain' });
-    res.end('Not found');
+    res.writeHead(404, { "content-type": "text/plain" });
+    res.end("Not found");
   }
 });
 
 // A single bad request must never take the whole preview server down.
-server.on('clientError', (_err, socket) => {
-  if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+server.on("clientError", (_err, socket) => {
+  if (socket.writable) socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
 });
-process.on('uncaughtException', (err) => {
-  console.error('preview: uncaught', err?.message ?? err);
+process.on("uncaughtException", (err) => {
+  console.error("preview: uncaught", err?.message ?? err);
 });
 
 // Watch the built client and tell connected tabs to reload on any change.
 // `vite build --watch` rewrites dist/client on every source edit.
 try {
   watch(ROOT, { recursive: true }, () => scheduleReload());
-  console.log('Live reload: watching dist/client for changes');
+  console.log("Live reload: watching dist/client for changes");
 } catch (err) {
-  console.warn('Live reload watch failed (edits still served, just no auto-refresh):', err?.message ?? err);
+  console.warn(
+    "Live reload watch failed (edits still served, just no auto-refresh):",
+    err?.message ?? err,
+  );
 }
 
 server.listen(PORT, () => {
   console.log(`Peak Putt preview running at http://localhost:${PORT}/`);
-  console.log('(mocked /api — real data only works via `devvit playtest`)');
+  console.log("(mocked /api — real data only works via `devvit playtest`)");
 });

@@ -1,4 +1,4 @@
-import type { Level, LevelFeature, LevelFeatureType } from './types';
+import type { Level, LevelFeature, LevelFeatureType } from "./types";
 
 /**
  * Small, fast, seedable PRNG (mulberry32). Deterministic across client/server
@@ -43,12 +43,12 @@ export function generateLevel(seed: number): Level {
 
   // Border walls (left + right) so the ball stays in the play field.
   for (let r = 0; r < rows; r++) {
-    features.push({ type: 'wall', col: 0, row: r });
-    features.push({ type: 'wall', col: cols - 1, row: r });
+    features.push({ type: "wall", col: 0, row: r });
+    features.push({ type: "wall", col: cols - 1, row: r });
   }
   // Floor.
   for (let c = 0; c < cols; c++) {
-    features.push({ type: 'wall', col: c, row: 0 });
+    features.push({ type: "wall", col: c, row: 0 });
   }
 
   const tee = { col: 2 + Math.floor(rng() * 3), row: 1 };
@@ -70,12 +70,12 @@ export function generateLevel(seed: number): Level {
     startCol = Math.max(1, Math.min(cols - 1 - ledgeWidth, startCol));
 
     for (let i = 0; i < ledgeWidth; i++) {
-      features.push({ type: 'wall', col: startCol + i, row });
+      features.push({ type: "wall", col: startCol + i, row });
     }
 
     // Sometimes cap an end with a ramp for interesting bounces.
     if (rng() > 0.5) {
-      const rampType: LevelFeatureType = goRight ? 'ramp-right' : 'ramp-left';
+      const rampType: LevelFeatureType = goRight ? "ramp-right" : "ramp-left";
       const rampCol = goRight ? startCol + ledgeWidth : startCol - 1;
       if (rampCol > 0 && rampCol < cols - 1) {
         features.push({ type: rampType, col: rampCol, row: row + 1 });
@@ -85,7 +85,7 @@ export function generateLevel(seed: number): Level {
     // Bouncer pad on some ledges.
     if (rng() > 0.7) {
       features.push({
-        type: 'bouncer',
+        type: "bouncer",
         col: startCol + Math.floor(rng() * ledgeWidth),
         row: row + 1,
       });
@@ -94,7 +94,7 @@ export function generateLevel(seed: number): Level {
     // Sand traps slow the ball; place above a ledge.
     if (rng() > 0.75) {
       features.push({
-        type: 'sand',
+        type: "sand",
         col: startCol + Math.floor(rng() * ledgeWidth),
         row: row + 1,
       });
@@ -103,13 +103,13 @@ export function generateLevel(seed: number): Level {
     // Floating hazard in the gap between bands.
     if (b > 0 && rng() > 0.6) {
       const hazCol = 2 + Math.floor(rng() * (cols - 4));
-      features.push({ type: 'hazard', col: hazCol, row: row - 2 });
+      features.push({ type: "hazard", col: hazCol, row: row - 2 });
     }
 
     // Checkpoint roughly every other band, on the ledge.
     if (b > 0 && b % 2 === 1) {
       features.push({
-        type: 'checkpoint',
+        type: "checkpoint",
         col: startCol + Math.floor(ledgeWidth / 2),
         row: row + 1,
       });
