@@ -21,6 +21,7 @@ export type TileRole =
   | 'empty'
   | 'ground'
   | 'spawn'
+  | 'flag'
   | 'finish'
   | 'checkpoint'
   | 'water'
@@ -133,8 +134,9 @@ export function cleanGid(raw: number): number {
 export function roleOfId(id: number): TileRole {
   if (id < 0) return 'empty';
   if (id === T_SPAWN) return 'spawn';
-  if (id === T_FINISH_FLAG || finishGroundSet.has(id)) return 'finish';
-  if (id === T_CHECKPOINT_FLAG || checkpointGroundSet.has(id)) return 'checkpoint';
+  if (isFlagId(id)) return 'flag';
+  if (finishGroundSet.has(id)) return 'finish';
+  if (checkpointGroundSet.has(id)) return 'checkpoint';
   if (id === T_WATER) return 'water';
   if (roughSet.has(id)) return 'rough';
   if (id === T_ICE) return 'ice';

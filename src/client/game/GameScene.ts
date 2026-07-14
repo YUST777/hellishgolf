@@ -36,7 +36,13 @@ import {
 import { sound } from './sound';
 import { RAPIER } from './physics';
 
-type CheckpointZone = { rect: Phaser.Geom.Rectangle; key: string };
+type CheckpointZone = {
+  rect: Phaser.Geom.Rectangle;
+  key: string;
+  row: number;
+  startCol: number;
+  endCol: number;
+};
 
 /**
  * Renders a real Kinda Hard Golf Tiled map and runs the ball with the actual
@@ -77,10 +83,8 @@ export class GameScene extends Phaser.Scene {
   private roughRects: Phaser.Geom.Rectangle[] = [];
   private checkpointZones: CheckpointZone[] = [];
   private activatedCheckpointKeys = new Set<string>();
-  /** The checkpoint flag: fires once when the ball reaches it. */
-  private flagCell: { col: number; row: number } | null = null;
+  /** The flag is visual only; checkpoint activation comes from the ground. */
   private flagSprite: Phaser.GameObjects.Image | null = null;
-  private checkpointDone = false;
   /** True once a shot has been taken since the last spawn/respawn. */
   private shotSinceReset = false;
   private finishZone!: Phaser.Geom.Rectangle;
@@ -133,9 +137,7 @@ export class GameScene extends Phaser.Scene {
     this.roughRects = [];
     this.checkpointZones = [];
     this.activatedCheckpointKeys = new Set();
-    this.flagCell = null;
     this.flagSprite = null;
-    this.checkpointDone = false;
     this.shotSinceReset = false;
     this.accumulator = 0;
     this.groundHandles = new Set();
@@ -335,10 +337,10 @@ export class GameScene extends Phaser.Scene {
           .image(x, y, 'tileset', frame)
           .setDisplaySize(TILE + 1, TILE + 1)
           .setDepth(5);
-        // The flag (id 153) is the walk-through checkpoint marker.
-        if (cleanGid(gid) - 1 === 153) {
+        // Flags stay visual-only; checkpoint activation comes from landing on
+        // checkpoint-ground tiles.
+        if (isFlagId(cleanGid(gid) - 1)) {
           this.flagSprite = img;
-          this.flagCell = { col, row };
         }
       }
     }
@@ -469,6 +471,9 @@ export class GameScene extends Phaser.Scene {
 
         zones.push({
           key: `${startCol}-${endCol},${row}`,
+          row,
+          startCol,
+          endCol,
           rect: new Phaser.Geom.Rectangle(
             startCol * TILE - padX,
             row * TILE - topPad,
@@ -962,24 +967,27 @@ export class GameScene extends Phaser.Scene {
     this.inRough = overRough;
 
     this.checkCheckpointGround();
-    this.checkFlagCheckpoint();
   }
 
   /**
-   * Checkpoint platforms are solid tiles, so the ball center rests above the
-   * tile art. The expanded zones built in buildCheckpointZones cover that
-   * playable area and save the exact grounded ball position as the respawn.
+   * Checkpoints only count when the ball is grounded with its feet over
+   * checkpoint-ground. The flag itself is visual-only and never activates this.
    */
   private checkCheckpointGround() {
     if (this.infuriating || this.checkpointZones.length === 0) return;
     if (!this.isGrounded()) return;
 
+    const footRow = Math.floor((this.ball.y + BALL_RADIUS + 2) / TILE);
+    const minFootCol = Math.floor((this.ball.x - BALL_RADIUS * 0.65) / TILE);
+    const maxFootCol = Math.floor((this.ball.x + BALL_RADIUS * 0.65) / TILE);
     const ballCircle = new Phaser.Geom.Circle(
       this.ball.x,
       this.ball.y,
       BALL_RADIUS * 0.95
     );
     for (const zone of this.checkpointZones) {
+      if (zone.row !== footRow) continue;
+      if (maxFootCol < zone.startCol || minFootCol > zone.endCol) continue;
       if (!Phaser.Geom.Intersects.CircleToRectangle(ballCircle, zone.rect)) continue;
 
       this.respawn.set(this.ball.x, this.ball.y);
@@ -988,34 +996,13 @@ export class GameScene extends Phaser.Scene {
         sound.play('Chime', 0.5);
         this.onCheckpoint?.();
         this.game.events.emit('checkpoint-reached');
-        this.cameras.main.flash(140, 253, 223, 106);
+        this.playCheckpointGlow(this.ball.x, this.ball.y);
       }
       return;
     }
   }
 
-  /**
-   * The flag is a walk-through checkpoint. The FIRST time the ball reaches it
-   * while grounded, it activates ONCE: plays a sound, glows the flag brightly,
-   * and saves the current ball spot as the respawn. Never solid — the ball
-   * passes through the flag.
-   */
-  private checkFlagCheckpoint() {
-    if (this.infuriating || this.checkpointDone || !this.flagCell) return;
-    if (!this.isGrounded()) return;
-    const c = this.cellCenter(this.flagCell.col, this.flagCell.row);
-    if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, c.x, c.y) > TILE * 2) {
-      return;
-    }
-    this.checkpointDone = true;
-    this.respawn.set(this.ball.x, this.ball.y);
-    sound.play('Chime', 0.5);
-    this.onCheckpoint?.();
-    this.game.events.emit('checkpoint-reached');
-    this.playCheckpointGlow(c.x, c.y);
-  }
-
-  /** One-shot bright glow-up on the flag when the checkpoint activates. */
+  /** One-shot bright glow-up when a checkpoint activates. */
   private playCheckpointGlow(x: number, y: number) {
     // Expanding, fading bright ring.
     const ring = this.add.circle(x, y, TILE * 0.6, 0xffe066, 0.7).setDepth(7);
