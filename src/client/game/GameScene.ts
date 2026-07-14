@@ -44,7 +44,12 @@ import {
 } from "../../shared/tiles";
 import { sound } from "./sound";
 import { RAPIER } from "./physics";
-import { getBallSkin, type BallSkinId, type PowerupKind } from "./powerups";
+import {
+  MAX_COINS_PER_DAILY_MAP,
+  getBallSkin,
+  type BallSkinId,
+  type PowerupKind,
+} from "./powerups";
 
 type CheckpointZone = {
   rect: Phaser.Geom.Rectangle;
@@ -862,7 +867,7 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
       picked.push({ col: c.col, row: c.row });
-      if (picked.length >= 5) break;
+      if (picked.length >= MAX_COINS_PER_DAILY_MAP) break;
     }
     return picked;
   }

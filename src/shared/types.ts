@@ -3,6 +3,8 @@
  * All server endpoints live under /api/ and exchange these shapes.
  */
 
+import type { BallSkinId, PlayerState, PowerupKind } from "./economy";
+
 /** A single obstacle/feature placed in a hole. */
 export type LevelFeatureType =
   | "wall"
@@ -62,6 +64,25 @@ export interface InitResponse {
   streak: number;
   /** Real Tiled map id for this post's hole (loaded client-side from JSON). */
   mapId: number;
+  /** Account-backed wallet and onboarding state. Null for anonymous players. */
+  player: PlayerState | null;
+}
+
+export interface PlayerActionResponse {
+  ok: boolean;
+  player: PlayerState;
+}
+
+export interface CollectCoinRequest {
+  coinId: string;
+}
+
+export interface PowerupActionRequest {
+  kind: PowerupKind;
+}
+
+export interface SkinActionRequest {
+  skinId: BallSkinId;
 }
 
 export interface SubmitScoreRequest {

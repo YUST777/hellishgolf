@@ -1,6 +1,10 @@
 import type {
+  CollectCoinRequest,
   InitResponse,
   LeaderboardResponse,
+  PlayerActionResponse,
+  PowerupActionRequest,
+  SkinActionRequest,
   SubmitScoreRequest,
   SubmitScoreResponse,
 } from "../../shared/types";
@@ -9,8 +13,20 @@ import { pickMapId } from "../../shared/mapManifest";
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
+  if (!res.ok) throw new Error(await responseError(res, `GET ${url} failed`));
   return (await res.json()) as T;
+}
+
+async function responseError(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { message?: unknown };
+    if (typeof body.message === "string" && body.message.trim()) {
+      return body.message.trim();
+    }
+  } catch {
+    // The response may be HTML or empty; use the status fallback below.
+  }
+  return `${fallback}: ${res.status}`;
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -19,7 +35,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
+  if (!res.ok) throw new Error(await responseError(res, `POST ${url} failed`));
   return (await res.json()) as T;
 }
 
@@ -81,6 +97,7 @@ function offlineInit(): InitResponse {
     bestToday: offlineBest(dateKey),
     streak: 0,
     mapId,
+    player: null,
   };
 }
 
@@ -124,5 +141,25 @@ export const apiClient = {
       }
     }
     return { entries: [], totalPlayers: 0, you: null };
+  },
+
+  collectCoin(payload: CollectCoinRequest): Promise<PlayerActionResponse> {
+    return postJson<PlayerActionResponse>("/api/player/coin", payload);
+  },
+
+  buyPowerup(payload: PowerupActionRequest): Promise<PlayerActionResponse> {
+    return postJson<PlayerActionResponse>("/api/player/powerup/buy", payload);
+  },
+
+  consumePowerup(payload: PowerupActionRequest): Promise<PlayerActionResponse> {
+    return postJson<PlayerActionResponse>("/api/player/powerup/use", payload);
+  },
+
+  chooseSkin(payload: SkinActionRequest): Promise<PlayerActionResponse> {
+    return postJson<PlayerActionResponse>("/api/player/skin", payload);
+  },
+
+  completeTutorial(): Promise<PlayerActionResponse> {
+    return postJson<PlayerActionResponse>("/api/player/tutorial", {});
   },
 };

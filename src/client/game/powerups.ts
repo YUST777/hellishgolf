@@ -1,168 +1,112 @@
-export type PowerupKind = "trajectory" | "sticky" | "checkpoint";
+import {
+  POWERUP_PRICES,
+  createStarterEconomy,
+  getBallSkin,
+  isBallSkinId,
+  normalizeEconomy,
+  type BallSkinId,
+  type PlayerEconomy,
+  type PlayerState,
+  type PowerupKind,
+} from "../../shared/economy";
 
-export const POWERUP_ORDER: readonly PowerupKind[] = [
-  "trajectory",
-  "sticky",
-  "checkpoint",
-];
+export {
+  BALL_SKINS,
+  DEFAULT_BALL_SKIN,
+  MAX_COINS_PER_DAILY_MAP,
+  POWERUP_NAMES,
+  POWERUP_ORDER,
+  POWERUP_PRICES,
+  STARTER_POWERUP_COUNT,
+  getBallSkin,
+  isBallSkinId,
+  isPowerupKind,
+} from "../../shared/economy";
+export type {
+  BallSkinDefinition,
+  BallSkinId,
+  BallSkinInventory,
+  PlayerEconomy,
+  PlayerState,
+  PowerupInventory,
+  PowerupKind,
+} from "../../shared/economy";
 
-export const POWERUP_PRICES: Record<PowerupKind, number> = {
-  trajectory: 3,
-  sticky: 6,
-  checkpoint: 10,
-};
-
-export const POWERUP_NAMES: Record<PowerupKind, string> = {
-  trajectory: "Trajectory",
-  sticky: "Sticky Slime",
-  checkpoint: "Checkpoint",
-};
-
-export type BallSkinId = "classic" | "ember" | "slime" | "gold";
-
-export interface BallSkinDefinition {
-  id: BallSkinId;
-  name: string;
-  price: number;
-  body: number;
-  highlight: number;
-  dimple: number;
-  outline: number;
-}
-
-export const DEFAULT_BALL_SKIN: BallSkinId = "classic";
-
-export const BALL_SKINS: readonly BallSkinDefinition[] = [
-  {
-    id: "classic",
-    name: "Classic",
-    price: 0,
-    body: 0xffffff,
-    highlight: 0xfff4e5,
-    dimple: 0xe6e6e6,
-    outline: 0x1a1a1a,
-  },
-  {
-    id: "ember",
-    name: "Ember",
-    price: 18,
-    body: 0xff6b1a,
-    highlight: 0xfff1a6,
-    dimple: 0x7c2d12,
-    outline: 0x3b1206,
-  },
-  {
-    id: "slime",
-    name: "Slime",
-    price: 22,
-    body: 0x8fff95,
-    highlight: 0xe7ffe7,
-    dimple: 0x047857,
-    outline: 0x052e16,
-  },
-  {
-    id: "gold",
-    name: "Gold",
-    price: 35,
-    body: 0xffd65a,
-    highlight: 0xfff7c2,
-    dimple: 0x8a4b0f,
-    outline: 0x4a2c17,
-  },
-];
-
-export type BallSkinInventory = {
-  owned: BallSkinId[];
-  equipped: BallSkinId;
-};
-
-export type PowerupInventory = Record<PowerupKind, number>;
-
-export interface PowerupState {
-  coins: number;
-  inventory: PowerupInventory;
-  skins: BallSkinInventory;
+export interface PowerupState extends PlayerEconomy {
   collected: Record<string, string[]>;
+  storageKey: string;
 }
 
-const STORAGE_KEY = "khg_powerups_v1";
+const STORAGE_KEY = "hellishgolf_player_v2";
+const LEGACY_STORAGE_KEY = "khg_powerups_v1";
+
+function storageKey(accountId?: string | null): string {
+  const account = accountId?.trim().toLowerCase();
+  return account ? `${STORAGE_KEY}:${account}` : `${STORAGE_KEY}:offline`;
+}
 
 export function coinCollectionKey(dateKey: string, mapId: number): string {
   return `${dateKey}:${mapId}`;
 }
 
-function emptyInventory(): PowerupInventory {
+function starterState(key: string): PowerupState {
   return {
-    trajectory: 0,
-    sticky: 0,
-    checkpoint: 0,
+    ...createStarterEconomy(),
+    collected: {},
+    storageKey: key,
   };
 }
 
-function normalizeInventory(value: unknown): PowerupInventory {
-  const raw = value && typeof value === "object" ? value : {};
-  const rec = raw as Record<string, unknown>;
-  return {
-    trajectory: Math.max(0, Math.floor(Number(rec.trajectory) || 0)),
-    sticky: Math.max(0, Math.floor(Number(rec.sticky) || 0)),
-    checkpoint: Math.max(0, Math.floor(Number(rec.checkpoint) || 0)),
-  };
-}
-
-function isBallSkinId(value: unknown): value is BallSkinId {
-  return BALL_SKINS.some((skin) => skin.id === value);
-}
-
-function normalizeSkins(value: unknown): BallSkinInventory {
-  const raw =
-    value && typeof value === "object"
-      ? (value as Record<string, unknown>)
-      : {};
-  const ownedRaw = Array.isArray(raw.owned) ? raw.owned : [];
-  const owned = new Set<BallSkinId>([DEFAULT_BALL_SKIN]);
-  for (const id of ownedRaw) {
-    if (isBallSkinId(id)) owned.add(id);
-  }
-  const equipped =
-    isBallSkinId(raw.equipped) && owned.has(raw.equipped)
-      ? raw.equipped
-      : DEFAULT_BALL_SKIN;
-  return { owned: [...owned], equipped };
-}
-
-export function getBallSkin(id: unknown): BallSkinDefinition {
-  return BALL_SKINS.find((skin) => skin.id === id) ?? BALL_SKINS[0]!;
-}
-
-export function loadPowerupState(): PowerupState {
+export function loadPowerupState(accountId?: string | null): PowerupState {
+  const key = storageKey(accountId);
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as {
-      coins?: unknown;
-      inventory?: unknown;
-      skins?: unknown;
-      collected?: unknown;
-    };
+    const current = localStorage.getItem(key);
+    const legacy = accountId ? null : localStorage.getItem(LEGACY_STORAGE_KEY);
+    const stored = current ?? legacy;
+    if (!stored) return starterState(key);
+
+    const raw = JSON.parse(stored) as Record<string, unknown>;
+    const economy = normalizeEconomy(raw);
     return {
-      coins: Math.max(0, Math.floor(Number(raw.coins) || 0)),
-      inventory: normalizeInventory(raw.inventory),
-      skins: normalizeSkins(raw.skins),
+      ...economy,
       collected:
         raw.collected && typeof raw.collected === "object"
           ? (raw.collected as Record<string, string[]>)
           : {},
+      storageKey: key,
     };
   } catch {
-    return {
-      coins: 0,
-      inventory: emptyInventory(),
-      skins: normalizeSkins(null),
-      collected: {},
-    };
+    return starterState(key);
   }
 }
 
 export function savePowerupState(state: PowerupState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const { storageKey: key, ...stored } = state;
+  localStorage.setItem(key, JSON.stringify(stored));
+}
+
+export function applyPlayerState(
+  state: PowerupState,
+  player: PlayerState,
+  dateKey: string,
+  mapId: number,
+): void {
+  state.coins = player.coins;
+  state.inventory = { ...player.inventory };
+  state.skins = {
+    owned: [...player.skins.owned],
+    equipped: player.skins.equipped,
+  };
+  state.tutorialComplete = player.tutorialComplete;
+  state.collected[coinCollectionKey(dateKey, mapId)] = [
+    ...player.collectedCoinIds,
+  ];
+  savePowerupState(state);
+}
+
+export function completeTutorial(state: PowerupState): void {
+  state.tutorialComplete = true;
+  savePowerupState(state);
 }
 
 export function collectedCoinIds(
@@ -218,7 +162,8 @@ export function buySkin(state: PowerupState, skinId: BallSkinId): boolean {
 }
 
 export function equipSkin(state: PowerupState, skinId: BallSkinId): boolean {
-  if (!state.skins.owned.includes(skinId)) return false;
+  if (!isBallSkinId(skinId) || !state.skins.owned.includes(skinId))
+    return false;
   state.skins.equipped = skinId;
   savePowerupState(state);
   return true;
@@ -232,4 +177,14 @@ export function consumePowerup(
   state.inventory[kind] -= 1;
   savePowerupState(state);
   return true;
+}
+
+export function resetToStarterState(state: PowerupState): void {
+  const starter = createStarterEconomy();
+  state.coins = starter.coins;
+  state.inventory = starter.inventory;
+  state.skins = starter.skins;
+  state.tutorialComplete = starter.tutorialComplete;
+  state.collected = {};
+  savePowerupState(state);
 }

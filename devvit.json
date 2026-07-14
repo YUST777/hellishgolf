@@ -92,5 +92,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch"
+  },
+  "dev": {
+    "subreddit": "hellishgolf_dev"
   }
 }

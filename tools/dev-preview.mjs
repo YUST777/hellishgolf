@@ -159,6 +159,7 @@ const server = createServer(async (req, res) => {
       bestToday: you ? you.strokes : null,
       streak,
       mapId: id,
+      player: null,
     });
   }
 
