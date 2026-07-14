@@ -6,8 +6,8 @@
  *
  * The original game classifies tiles like so (tileId values):
  *   spawn            = 209        (the tee / ball start)
- *   finish-flag      = 154        finish-ground = 111,112,113
- *   checkpoint-flag  = 153        checkpoint-ground = 166,167,168,265,266,267,200
+ *   finish-flag      = 153        finish-ground = 110,111,112
+ *   checkpoint-flag  = 152        checkpoint-ground = 165,166,167,168,199,264,265,266
  *   water (hazard)   = 176
  *   rough (sand)     = 496,497,498,499
  *   ice              = 103
@@ -34,8 +34,8 @@ export type TileRole =
 
 // --- tileId constants (NOT gids) ------------------------------------------
 export const T_SPAWN = 209;
-export const T_FINISH_FLAG = 154;
-export const T_CHECKPOINT_FLAG = 153;
+export const T_FINISH_FLAG = 153;
+export const T_CHECKPOINT_FLAG = 152;
 // The daily maps use tile id 175 for water (verified: originally blue in the
 // atlas). 176 is unused, so the old value never matched -> lava never killed.
 export const T_WATER = 175;
@@ -44,8 +44,8 @@ export const T_ICE = 103;
 export const T_ROUGH = [496, 497, 498, 499];
 export const T_BIRDS = [11, 12, 13, 14, 15, 16, 17, 18];
 
-export const T_FINISH_GROUND = [111, 112, 113];
-export const T_CHECKPOINT_GROUND = [166, 167, 168, 265, 266, 267, 200];
+export const T_FINISH_GROUND = [110, 111, 112];
+export const T_CHECKPOINT_GROUND = [165, 166, 167, 168, 199, 264, 265, 266];
 
 export const T_RAMP_UP = [172, 169]; // up-ground, up-ceiling
 export const T_RAMP_DOWN = [173, 202]; // down-ground, down-ceiling
@@ -176,6 +176,9 @@ export const SOLID_GIDS: number[] = SOLID_TILE_IDS.map((id) => id + 1);
 
 /** Set of tileIds (NOT gids) that count as the finish (flag + ground). */
 export const finishGidSet = new Set<number>([T_FINISH_FLAG, ...T_FINISH_GROUND]);
+
+/** The finish flag tileId (NOT gid). */
+export const finishFlagGid = T_FINISH_FLAG;
 
 /** The checkpoint flag tileId (NOT gid). */
 export const checkpointFlagGid = T_CHECKPOINT_FLAG;

@@ -84,7 +84,7 @@ export class GameScene extends Phaser.Scene {
   private checkpointZones: CheckpointZone[] = [];
   private activatedCheckpointKeys = new Set<string>();
   /** The flag is visual only; checkpoint activation comes from the ground. */
-  private flagSprite: Phaser.GameObjects.Image | null = null;
+  private flagSprites: Phaser.GameObjects.Image[] = [];
   /** True once a shot has been taken since the last spawn/respawn. */
   private shotSinceReset = false;
   private finishZone!: Phaser.Geom.Rectangle;
@@ -137,7 +137,7 @@ export class GameScene extends Phaser.Scene {
     this.roughRects = [];
     this.checkpointZones = [];
     this.activatedCheckpointKeys = new Set();
-    this.flagSprite = null;
+    this.flagSprites = [];
     this.shotSinceReset = false;
     this.accumulator = 0;
     this.groundHandles = new Set();
@@ -340,7 +340,7 @@ export class GameScene extends Phaser.Scene {
         // Flags stay visual-only; checkpoint activation comes from landing on
         // checkpoint-ground tiles.
         if (isFlagId(cleanGid(gid) - 1)) {
-          this.flagSprite = img;
+          this.flagSprites.push(img);
         }
       }
     }
@@ -1016,8 +1016,8 @@ export class GameScene extends Phaser.Scene {
     });
     this.cameras.main.flash(160, 253, 223, 106);
     // Flash the flag bright, then leave it subtly lit.
-    if (this.flagSprite) {
-      const s = this.flagSprite;
+    const s = this.nearestFlagSprite(x, y);
+    if (s) {
       const baseX = s.scaleX;
       const baseY = s.scaleY;
       s.setTint(0xffffff);
@@ -1034,6 +1034,19 @@ export class GameScene extends Phaser.Scene {
         },
       });
     }
+  }
+
+  private nearestFlagSprite(x: number, y: number): Phaser.GameObjects.Image | null {
+    let best: Phaser.GameObjects.Image | null = null;
+    let bestDist = Infinity;
+    for (const s of this.flagSprites) {
+      const d = Phaser.Math.Distance.Squared(x, y, s.x, s.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = s;
+      }
+    }
+    return bestDist <= TILE * TILE * 9 ? best : null;
   }
 
   /**

@@ -8,6 +8,7 @@ import {
   TILESET,
   roleOfGid,
   finishGidSet,
+  finishFlagGid,
   checkpointFlagGid,
 } from './tiles';
 
@@ -66,7 +67,7 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
   const gids = raw.map((v) => v & FLIP_MASK);
 
   const checkpoints: RuntimeCell[] = [];
-  const flagCells: RuntimeCell[] = [];
+  const finishFlagCells: RuntimeCell[] = [];
   const finishGroundCells: RuntimeCell[] = [];
 
   for (let row = 0; row < rows; row++) {
@@ -76,15 +77,14 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
       const id = gid - 1;
       if (id === checkpointFlagGid) {
         checkpoints.push({ col, row });
-        flagCells.push({ col, row });
       }
+      if (id === finishFlagGid) finishFlagCells.push({ col, row });
       if (finishGidSet.has(id)) finishGroundCells.push({ col, row });
     }
   }
 
-  // The daily holes have a single flag that IS the goal. Anchor the finish on
-  // that flag when present; otherwise fall back to the finish-ground cluster,
-  // then the map centre.
+  // Anchor the finish on the finish flag when present; otherwise fall back to
+  // the finish-ground cluster, then the map centre.
   const anchorFrom = (cells: RuntimeCell[]): RuntimeCell | null => {
     if (cells.length === 0) return null;
     const minRow = Math.min(...cells.map((c) => c.row));
@@ -93,7 +93,7 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
     return { col: avgCol, row: minRow };
   };
   const finish: RuntimeCell =
-    anchorFrom(flagCells) ??
+    anchorFrom(finishFlagCells) ??
     anchorFrom(finishGroundCells) ?? { col: Math.floor(cols / 2), row: 1 };
 
   const spawn = deriveSpawn(gids, cols, rows, finish);
