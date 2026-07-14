@@ -85,6 +85,37 @@
         color: #fff;
         text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
       }
+      .svg-sprite {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+      .ui-icon {
+        width: 1em;
+        height: 1em;
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .ui-icon.filled {
+        fill: currentColor;
+        stroke: none;
+      }
+      .inline-icon {
+        width: 0.9em;
+        height: 0.9em;
+        display: inline-block;
+        vertical-align: -0.12em;
+      }
+      #infuriating-badge {
+        color: #ff7a1a;
+        margin-left: 4px;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+      }
 
       .hud {
         position: fixed;
@@ -115,6 +146,16 @@
       }
       #hud-streak {
         color: #fddf6a;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      #hud-streak .streak-fire {
+        display: none;
+        color: #ff7a1a;
+      }
+      #hud-streak.hot .streak-fire {
+        display: inline-block;
       }
       .hole-meta {
         flex-direction: column;
@@ -142,6 +183,10 @@
         display: flex;
         align-items: center;
         justify-content: center;
+      }
+      .icon-btn .ui-icon {
+        width: 23px;
+        height: 23px;
       }
       .icon-btn:active {
         transform: translateY(2px);
@@ -199,6 +244,19 @@
         align-items: center;
         justify-content: center;
       }
+      #zoom-controls .ui-icon {
+        width: 21px;
+        height: 21px;
+      }
+      #btn-mute .sound-off {
+        display: none;
+      }
+      #btn-mute.is-muted .sound-on {
+        display: none;
+      }
+      #btn-mute.is-muted .sound-off {
+        display: block;
+      }
       #zoom-controls button:active {
         transform: translateY(2px);
         background: rgba(0, 0, 0, 0.75);
@@ -242,9 +300,7 @@
       .coin-icon {
         width: 14px;
         height: 14px;
-        border-radius: 50%;
-        background: radial-gradient(circle at 35% 30%, #fff1a6 0 20%, #ffd65a 22% 65%, #8a4b0f 67%);
-        box-shadow: 0 0 0 1px #6b3a09;
+        flex: 0 0 14px;
       }
       .powerup-btn {
         position: relative;
@@ -276,9 +332,15 @@
         cursor: url(game/cursors/mouse_default.png) 0 0, auto;
       }
       .powerup-icon {
-        font-size: 21px;
-        line-height: 1;
-        text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.45));
+      }
+      .powerup-icon .ui-icon {
+        width: 23px;
+        height: 23px;
       }
       .powerup-btn[data-powerup="trajectory"] .powerup-icon {
         color: #9ffcff;
@@ -342,7 +404,12 @@
           padding-inline: 4px;
         }
         .powerup-icon {
-          font-size: 19px;
+          width: 22px;
+          height: 22px;
+        }
+        .powerup-icon .ui-icon {
+          width: 21px;
+          height: 21px;
         }
         .powerup-action {
           min-width: 42px;
@@ -541,9 +608,16 @@
         right: 20px;
         background: transparent;
         border: 0;
-        font-size: 26px;
         color: #7b3518;
-        line-height: 1;
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        padding: 0;
+      }
+      .modal-close .ui-icon {
+        width: 22px;
+        height: 22px;
       }
 
       /* Shop --------------------------------------------------------------*/
@@ -614,9 +688,12 @@
         justify-content: center;
         background: rgba(0, 0, 0, 0.62);
         color: #fff;
-        font-size: 22px;
         font-weight: 800;
         box-shadow: inset 0 2px rgba(255, 255, 255, 0.18);
+      }
+      .shop-item-icon .ui-icon {
+        width: 25px;
+        height: 25px;
       }
       .shop-swatch {
         border: 2px solid #1a1a1a;
@@ -784,14 +861,72 @@
     </style>
   </head>
   <body>
+    <svg class="svg-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="icon-trophy" viewBox="0 0 24 24">
+        <path d="M8 4h8v4a4 4 0 0 1-8 0V4Z" />
+        <path d="M8 6H4v1a4 4 0 0 0 4 4M16 6h4v1a4 4 0 0 1-4 4M12 12v5M8 20h8M10 17h4" />
+      </symbol>
+      <symbol id="icon-shop" viewBox="0 0 24 24">
+        <path d="M5 6h2l1.4 9.2a2 2 0 0 0 2 1.8h5.8a2 2 0 0 0 1.9-1.4L20 9H8" />
+        <circle cx="10" cy="20" r="1.4" />
+        <circle cx="17" cy="20" r="1.4" />
+      </symbol>
+      <symbol id="icon-volume-on" viewBox="0 0 24 24">
+        <path d="M4 10v4h4l5 4V6l-5 4H4Z" />
+        <path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" />
+      </symbol>
+      <symbol id="icon-volume-off" viewBox="0 0 24 24">
+        <path d="M4 10v4h4l5 4V6l-5 4H4Z" />
+        <path d="M17 10l4 4M21 10l-4 4" />
+      </symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="icon-minus" viewBox="0 0 24 24">
+        <path d="M5 12h14" />
+      </symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </symbol>
+      <symbol id="icon-fire" viewBox="0 0 24 24">
+        <path fill="currentColor" stroke="none" d="M12.4 22c-4.2 0-7.2-2.9-7.2-6.7 0-2.7 1.5-4.8 3.7-7 .5 1.7 1.4 2.7 2.5 3.2-.5-3.2.8-6.5 3.9-9.5.3 3.1 1.5 4.7 2.7 6.2 1.1 1.4 2.2 2.8 2.2 5.4 0 4.8-3.5 8.4-7.8 8.4Z" />
+      </symbol>
+      <symbol id="icon-coin" viewBox="0 0 24 24">
+        <circle cx="12" cy="13" r="9" fill="#8a4b0f" stroke="none" />
+        <circle cx="12" cy="12" r="8" fill="#ffd65a" stroke="#6b3a09" stroke-width="1.6" />
+        <circle cx="9" cy="9" r="2.2" fill="#fff1a6" stroke="none" />
+      </symbol>
+      <symbol id="icon-trajectory" viewBox="0 0 24 24">
+        <path d="M4 18c4.5-8.5 9.6-10.8 16-7" />
+        <circle cx="5" cy="18" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="11.5" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="20" cy="11" r="1.4" fill="currentColor" stroke="none" />
+      </symbol>
+      <symbol id="icon-sticky" viewBox="0 0 24 24">
+        <path fill="currentColor" stroke="none" d="M12.4 4.4c3.9 0 6.8 2.4 6.8 5.8 0 1.6-.7 2.7-1.6 3.8-.7.8-1.3 1.5-1.3 2.5 0 1.8-1.4 3.1-3.2 3.1-1.2 0-2.1-.6-2.8-1.3-.6-.6-1.1-1-2-1-2 0-3.5-1.5-3.5-3.4 0-1.4.8-2.4 1.6-3.1.9-.7 1.6-1.2 1.6-2.4 0-2.6 1.8-4.5 4.4-4.5Z" />
+      </symbol>
+      <symbol id="icon-checkpoint" viewBox="0 0 24 24">
+        <path d="M7 21V4" />
+        <path d="M8 5h10l-2.2 3L18 11H8" />
+        <path d="M5 21h6" />
+      </symbol>
+    </svg>
     <div id="game-root"></div>
 
-    <div id="loading">Descending into today&rsquo;s pit&hellip;</div>
+    <div id="loading">Descending into today's pit...</div>
 
     <!-- Title -->
     <div id="game-title-text">
       <span class="t-sub">Hellish</span>
-      <span class="t-main">Golf <span id="infuriating-badge" style="display:none">&#128293;</span></span>
+      <span class="t-main">
+        Golf
+        <svg id="infuriating-badge" class="inline-icon" style="display:none" aria-hidden="true">
+          <use href="#icon-fire"></use>
+        </svg>
+      </span>
     </div>
 
     <!-- HUD (right side) -->
@@ -804,44 +939,61 @@
         <span class="label">STROKES</span> <span id="hud-strokes">0</span>
       </div>
       <div class="pill">
-        <span class="label">BEST</span> <span id="hud-best">&mdash;</span>
+        <span class="label">BEST</span> <span id="hud-best">-</span>
       </div>
       <div class="pill">
-        <span class="label">STREAK</span> <span id="hud-streak">&mdash;</span>
+        <span class="label">STREAK</span>
+        <span id="hud-streak">
+          <svg class="inline-icon streak-fire" aria-hidden="true">
+            <use href="#icon-fire"></use>
+          </svg>
+          <span id="hud-streak-count">-</span>
+        </span>
       </div>
     </div>
 
     <!-- Icon buttons -->
-    <button id="btn-menu" class="icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
-    <button id="btn-leaderboard" class="icon-btn" title="Leaderboard">&#127942;</button>
+    <button id="btn-menu" class="icon-btn" title="Menu" aria-label="Menu">
+      <svg class="ui-icon" aria-hidden="true"><use href="#icon-menu"></use></svg>
+    </button>
+    <button id="btn-leaderboard" class="icon-btn" title="Leaderboard" aria-label="Leaderboard">
+      <svg class="ui-icon" aria-hidden="true"><use href="#icon-trophy"></use></svg>
+    </button>
     <button id="btn-shop" class="icon-btn" title="Shop" aria-label="Shop">
-      &#128722;
+      <svg class="ui-icon" aria-hidden="true"><use href="#icon-shop"></use></svg>
       <span class="shop-coin-badge" id="shop-coin-badge">0</span>
     </button>
 
     <div id="zoom-controls">
-      <button id="btn-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
-      <button id="btn-zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
-      <button id="btn-mute" title="Toggle sound" aria-label="Toggle sound">&#128266;</button>
+      <button id="btn-zoom-in" title="Zoom in" aria-label="Zoom in">
+        <svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+      </button>
+      <button id="btn-zoom-out" title="Zoom out" aria-label="Zoom out">
+        <svg class="ui-icon" aria-hidden="true"><use href="#icon-minus"></use></svg>
+      </button>
+      <button id="btn-mute" title="Toggle sound" aria-label="Toggle sound">
+        <svg class="ui-icon sound-on" aria-hidden="true"><use href="#icon-volume-on"></use></svg>
+        <svg class="ui-icon sound-off" aria-hidden="true"><use href="#icon-volume-off"></use></svg>
+      </button>
     </div>
 
     <div id="powerup-bar" aria-label="Powerups">
       <div id="coin-wallet" title="Coins">
-        <span class="coin-icon"></span>
+        <svg class="coin-icon" aria-hidden="true"><use href="#icon-coin"></use></svg>
         <span id="wallet-coins">0</span>
       </div>
       <button class="powerup-btn" data-powerup="trajectory" title="No Trajectory owned" aria-label="No Trajectory owned" disabled>
-        <span class="powerup-icon">&#10022;</span>
+        <span class="powerup-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-trajectory"></use></svg></span>
         <span class="powerup-count" id="powerup-trajectory-count">x0</span>
         <span class="powerup-action" id="powerup-trajectory-action">USE</span>
       </button>
       <button class="powerup-btn" data-powerup="sticky" title="No Sticky Slime owned" aria-label="No Sticky Slime owned" disabled>
-        <span class="powerup-icon">&#9679;</span>
+        <span class="powerup-icon"><svg class="ui-icon filled" aria-hidden="true"><use href="#icon-sticky"></use></svg></span>
         <span class="powerup-count" id="powerup-sticky-count">x0</span>
         <span class="powerup-action" id="powerup-sticky-action">USE</span>
       </button>
       <button class="powerup-btn" data-powerup="checkpoint" title="No Checkpoint owned" aria-label="No Checkpoint owned" disabled>
-        <span class="powerup-icon">&#9873;</span>
+        <span class="powerup-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-checkpoint"></use></svg></span>
         <span class="powerup-count" id="powerup-checkpoint-count">x0</span>
         <span class="powerup-action" id="powerup-checkpoint-action">USE</span>
       </button>
@@ -857,7 +1009,9 @@
     <div class="overlay hidden" id="menu-overlay">
       <div class="modal-panel-outer">
         <div class="modal-panel" style="position: relative">
-          <button class="modal-close" id="btn-menu-close" title="Close">&times;</button>
+          <button class="modal-close" id="btn-menu-close" title="Close" aria-label="Close">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+          </button>
           <h2>Menu</h2>
           <div class="menu-list">
             <button class="modal-button" id="menu-resume">Resume</button>
@@ -875,10 +1029,12 @@
     <div class="overlay hidden" id="shop-overlay">
       <div class="modal-panel-outer">
         <div class="modal-panel shop-panel" style="position: relative">
-          <button class="modal-close" id="btn-shop-close" title="Close">&times;</button>
+          <button class="modal-close" id="btn-shop-close" title="Close" aria-label="Close">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+          </button>
           <h2>Shop</h2>
           <div class="shop-wallet" title="Coins">
-            <span class="coin-icon"></span>
+            <svg class="coin-icon" aria-hidden="true"><use href="#icon-coin"></use></svg>
             <span id="shop-wallet-coins">0</span>
           </div>
           <div class="shop-tabs" role="tablist">
@@ -888,7 +1044,7 @@
           <section class="shop-section" id="shop-powerups">
             <div class="shop-grid">
               <div class="shop-item" id="shop-powerup-trajectory">
-                <div class="shop-item-icon">&#10022;</div>
+                <div class="shop-item-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-trajectory"></use></svg></div>
                 <div class="shop-copy">
                   <h3>Trajectory</h3>
                   <p>Aim preview for one shot.</p>
@@ -897,7 +1053,7 @@
                 <button class="modal-button shop-action" id="shop-buy-powerup-trajectory">BUY 3</button>
               </div>
               <div class="shop-item" id="shop-powerup-sticky">
-                <div class="shop-item-icon">&#9679;</div>
+                <div class="shop-item-icon"><svg class="ui-icon filled" aria-hidden="true"><use href="#icon-sticky"></use></svg></div>
                 <div class="shop-copy">
                   <h3>Sticky Slime</h3>
                   <p>Place slime on a wall.</p>
@@ -906,7 +1062,7 @@
                 <button class="modal-button shop-action" id="shop-buy-powerup-sticky">BUY 6</button>
               </div>
               <div class="shop-item" id="shop-powerup-checkpoint">
-                <div class="shop-item-icon">&#9873;</div>
+                <div class="shop-item-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-checkpoint"></use></svg></div>
                 <div class="shop-copy">
                   <h3>Checkpoint</h3>
                   <p>Create one safe return flag.</p>
@@ -976,7 +1132,9 @@
     <div class="overlay hidden" id="settings-overlay">
       <div class="modal-panel-outer">
         <div class="modal-panel" style="position: relative">
-          <button class="modal-close" id="btn-settings-close" title="Close">&times;</button>
+          <button class="modal-close" id="btn-settings-close" title="Close" aria-label="Close">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+          </button>
           <h2>Settings</h2>
           <div class="setting-row">
             <span class="setting-label">Default Zoom</span>
@@ -992,7 +1150,10 @@
           </div>
           <div class="setting-row">
             <span class="setting-label">
-              Infuriating Mode &#128293;
+              Infuriating Mode
+              <svg class="inline-icon" aria-hidden="true" style="color:#ff7a1a">
+                <use href="#icon-fire"></use>
+              </svg>
               <span style="display:block;font-size:11px;font-weight:500;opacity:0.75">Checkpoints disabled</span>
             </span>
             <button class="modal-button warning" id="settings-infuriating" style="width: auto; margin: 0; padding: 8px 18px">Off</button>
@@ -1005,9 +1166,11 @@
     <div class="overlay hidden" id="leaderboard-overlay">
       <div class="modal-panel-outer">
         <div class="modal-panel" style="position: relative">
-          <button class="modal-close" id="btn-lb-close" title="Close">&times;</button>
-          <h2>Today&rsquo;s Leaderboard</h2>
-          <div class="leaderboard-stat-box" id="lb-total">&mdash;</div>
+          <button class="modal-close" id="btn-lb-close" title="Close" aria-label="Close">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-close"></use></svg>
+          </button>
+          <h2>Today's Leaderboard</h2>
+          <div class="leaderboard-stat-box" id="lb-total">-</div>
           <ul id="leaderboard-list"></ul>
         </div>
       </div>
@@ -1017,11 +1180,16 @@
     <div class="overlay hidden" id="result-overlay">
       <div class="modal-panel-outer">
         <div class="modal-panel">
-          <h2>Escaped the pit! &#128293;</h2>
+          <h2>
+            Escaped the pit!
+            <svg class="inline-icon" aria-hidden="true" style="color:#ff7a1a">
+              <use href="#icon-fire"></use>
+            </svg>
+          </h2>
           <div class="modal-big" id="result-strokes">0</div>
           <div class="modal-sub">strokes</div>
-          <div class="modal-row"><span>Time</span><span id="result-time">&mdash;</span></div>
-          <div class="modal-row"><span>Rank</span><span id="result-rank">&mdash;</span></div>
+          <div class="modal-row"><span>Time</span><span id="result-time">-</span></div>
+          <div class="modal-row"><span>Rank</span><span id="result-rank">-</span></div>
           <div style="text-align:center;margin-top:14px;color:#7b3518">
             <span style="display:block;font-size:12px;opacity:0.7">New hole in</span>
             <span id="result-countdown" style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:0.05em">--:--:--</span>

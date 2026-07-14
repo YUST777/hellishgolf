@@ -90,8 +90,10 @@ const POWERUP_DESCRIPTIONS: Record<PowerupKind, string> = {
 
 function setHud(strokes: number, best: number | null, streak: number) {
   el('hud-strokes').textContent = String(strokes);
-  el('hud-best').textContent = best == null ? '\u2014' : String(best);
-  el('hud-streak').textContent = streak > 0 ? `\uD83D\uDD25 ${streak}` : '\u2014';
+  el('hud-best').textContent = best == null ? '-' : String(best);
+  const streakNode = el('hud-streak');
+  streakNode.classList.toggle('hot', streak > 0);
+  el('hud-streak-count').textContent = streak > 0 ? String(streak) : '-';
 }
 
 function toast(message: string) {
@@ -523,7 +525,9 @@ function toggleInfuriating() {
 function paintSound() {
   const muted = sound.isMuted();
   const muteBtn = el('btn-mute');
-  muteBtn.textContent = muted ? '\uD83D\uDD07' : '\uD83D\uDD0A';
+  muteBtn.classList.toggle('is-muted', muted);
+  muteBtn.title = muted ? 'Sound off' : 'Sound on';
+  muteBtn.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
   const sBtn = document.getElementById('settings-sound');
   if (sBtn) sBtn.textContent = muted ? 'Off' : 'On';
 }

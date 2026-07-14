@@ -66,6 +66,23 @@ type SlimePatch = {
   gfx: Phaser.GameObjects.Graphics;
 };
 
+type LaunchVector = {
+  raw: number;
+  power: number;
+  dir: Phaser.Math.Vector2;
+  velocityX: number;
+  velocityY: number;
+};
+
+type PredictionStop = 'water' | 'slime' | 'bounds' | null;
+
+const TRAJECTORY_PREVIEW_SECONDS = 4.2;
+const TRAJECTORY_SAMPLE_STEPS = 9;
+const TRAJECTORY_SENSOR_STEPS = Math.max(
+  1,
+  Math.round((1 / 60) / PHYSICS_TIMESTEP)
+);
+
 /**
  * Renders a real Kinda Hard Golf Tiled map and runs the ball with the actual
  * Rapier physics engine, using the constants pulled from the game bundle:
@@ -1147,6 +1164,23 @@ export class GameScene extends Phaser.Scene {
     return lerp(0xffd23d, 0xff3b1a, (power - 0.5) * 2);
   }
 
+  private launchVectorFromDrag(v: Phaser.Math.Vector2): LaunchVector | null {
+    const len = v.length();
+    if (len <= 0) return null;
+    const raw = Math.min(1, len / MAX_DRAG);
+    const snapped = 0.005 * Math.round(raw / 0.005);
+    const power = Math.pow(snapped, POWER_EXP);
+    const dir = v.clone().normalize();
+    const speed = power * MAX_LAUNCH_SPEED;
+    return {
+      raw,
+      power,
+      dir,
+      velocityX: dir.x * speed,
+      velocityY: dir.y * speed,
+    };
+  }
+
   /**
    * Throw indicator mirrored from the bundle's `Cg` draw: a black backing line
    * plus a colour line from the ball to the pulled point, a filled dot at that
@@ -1199,37 +1233,139 @@ export class GameScene extends Phaser.Scene {
 
   private drawTrajectoryPreview(v: Phaser.Math.Vector2) {
     this.trajectoryGfx.clear();
-    const raw = Math.min(1, v.length() / MAX_DRAG);
-    if (raw < 0.04) return;
-
-    const snapped = 0.005 * Math.round(raw / 0.005);
-    const power = Math.pow(snapped, POWER_EXP);
-    const dir = v.clone().normalize();
-    const vx = dir.x * power * MAX_LAUNCH_SPEED;
-    const vy = dir.y * power * MAX_LAUNCH_SPEED;
+    const launch = this.launchVectorFromDrag(v);
+    if (!launch || launch.raw < 0.04) return;
 
     this.trajectoryGfx.fillStyle(0x9ffcff, 0.82);
-    const dt = 0.08;
-    for (let i = 1; i <= 42; i++) {
-      const t = i * dt;
-      const x = this.ball.x + vx * PIXELS_PER_METER * t;
-      const y =
-        this.ball.y +
-        vy * PIXELS_PER_METER * t +
-        0.5 * GRAVITY_Y * PIXELS_PER_METER * t * t;
+    let predictionWorld: import('@dimforge/rapier2d-compat').World | null = null;
+    try {
+      predictionWorld = RAPIER.World.restoreSnapshot(this.world.takeSnapshot());
+      predictionWorld.timestep = PHYSICS_TIMESTEP;
+      const body = predictionWorld.getRigidBody(this.ballBody.handle);
+      const collider = predictionWorld.getCollider(this.ballCollider.handle);
 
-      if (
-        x < -TILE ||
-        y < -TILE ||
-        x > this.worldW + TILE ||
-        y > this.worldH + TILE ||
-        this.isSolidLikeGid(this.gidAt(Math.floor(x / TILE), Math.floor(y / TILE)))
-      ) {
+      body.setTranslation({ x: this.pxToM(this.ball.x), y: this.pxToM(this.ball.y) }, true);
+      body.setLinvel({ x: launch.velocityX, y: launch.velocityY }, true);
+      body.setAngvel(0, true);
+      body.setLinearDamping(BALL_LINEAR_DAMPING);
+      collider.setFriction(BALL_FRICTION);
+      collider.setRestitution(BALL_RESTITUTION);
+
+      const points = this.predictTrajectoryPoints(predictionWorld, body, collider);
+      const zoom = this.cameras.main.zoom || 1;
+      for (let i = 0; i < points.length; i++) {
+        const p = points[i];
+        const radius = Math.max(2, 5 - i * 0.04) / zoom;
+        this.trajectoryGfx.fillCircle(p.x, p.y, radius);
+      }
+    } catch {
+      this.trajectoryGfx.clear();
+    } finally {
+      predictionWorld?.free();
+    }
+  }
+
+  private predictTrajectoryPoints(
+    world: import('@dimforge/rapier2d-compat').World,
+    body: import('@dimforge/rapier2d-compat').RigidBody,
+    collider: import('@dimforge/rapier2d-compat').Collider
+  ): Phaser.Math.Vector2[] {
+    const points: Phaser.Math.Vector2[] = [];
+    const maxSteps = Math.round(TRAJECTORY_PREVIEW_SECONDS / PHYSICS_TIMESTEP);
+
+    for (let step = 1; step <= maxSteps; step++) {
+      this.applyPredictionSettleModel(world, body, collider);
+      world.step();
+
+      const pos = body.translation();
+      const x = pos.x * PIXELS_PER_METER;
+      const y = pos.y * PIXELS_PER_METER;
+
+      if (step % TRAJECTORY_SAMPLE_STEPS === 0) {
+        points.push(new Phaser.Math.Vector2(x, y));
+      }
+
+      if (step % TRAJECTORY_SENSOR_STEPS === 0) {
+        const stop = this.applyPredictionSensors(body, x, y);
+        if (stop) break;
+      }
+
+      if (this.predictionOutOfBounds(x, y)) break;
+      if (step > TRAJECTORY_SENSOR_STEPS && this.predictionResting(world, body, collider)) {
+        if (step % TRAJECTORY_SAMPLE_STEPS !== 0) {
+          points.push(new Phaser.Math.Vector2(x, y));
+        }
         break;
       }
-      const radius = Math.max(2, 5 - i * 0.06) / (this.cameras.main.zoom || 1);
-      this.trajectoryGfx.fillCircle(x, y, radius);
     }
+
+    return points;
+  }
+
+  private applyPredictionSettleModel(
+    world: import('@dimforge/rapier2d-compat').World,
+    body: import('@dimforge/rapier2d-compat').RigidBody,
+    collider: import('@dimforge/rapier2d-compat').Collider
+  ) {
+    const v = body.linvel();
+    const slow = Math.hypot(v.x, v.y) < BALL_SLOW_SPEED;
+    const settle = slow && this.predictionGrounded(world, collider);
+    body.setLinearDamping(settle ? BALL_SETTLE_DAMPING : BALL_LINEAR_DAMPING);
+    collider.setRestitution(settle ? BALL_SETTLE_RESTITUTION : BALL_RESTITUTION);
+  }
+
+  private predictionGrounded(
+    world: import('@dimforge/rapier2d-compat').World,
+    collider: import('@dimforge/rapier2d-compat').Collider
+  ): boolean {
+    let grounded = false;
+    world.contactPairsWith(collider, (other) => {
+      if (this.groundHandles.has(other.handle)) grounded = true;
+    });
+    return grounded;
+  }
+
+  private predictionResting(
+    world: import('@dimforge/rapier2d-compat').World,
+    body: import('@dimforge/rapier2d-compat').RigidBody,
+    collider: import('@dimforge/rapier2d-compat').Collider
+  ): boolean {
+    const v = body.linvel();
+    return Math.hypot(v.x, v.y) < REST_SPEED && this.predictionGrounded(world, collider);
+  }
+
+  private applyPredictionSensors(
+    body: import('@dimforge/rapier2d-compat').RigidBody,
+    x: number,
+    y: number
+  ): PredictionStop {
+    const ballCircle = new Phaser.Geom.Circle(x, y, BALL_RADIUS * 0.7);
+    for (const r of this.waterRects) {
+      if (Phaser.Geom.Intersects.CircleToRectangle(ballCircle, r)) return 'water';
+    }
+
+    for (const r of this.roughRects) {
+      if (Phaser.Geom.Rectangle.Contains(r, x, y)) {
+        const v = body.linvel();
+        body.setLinvel({ x: v.x * 0.9, y: v.y * 0.94 }, true);
+        break;
+      }
+    }
+
+    const stickyCircle = new Phaser.Geom.Circle(x, y, BALL_RADIUS * 1.05);
+    for (const patch of this.slimePatches) {
+      if (Phaser.Geom.Intersects.CircleToCircle(stickyCircle, patch.circle)) {
+        body.setLinvel({ x: 0, y: 0 }, true);
+        body.setAngvel(0, true);
+        return 'slime';
+      }
+    }
+
+    return null;
+  }
+
+  private predictionOutOfBounds(x: number, y: number): boolean {
+    return x < -TILE || x > this.worldW + TILE || y < -TILE || y > this.worldH + 400;
   }
 
   private placeStickySlimeFromPointer(p: Phaser.Input.Pointer) {
@@ -1366,13 +1502,8 @@ export class GameScene extends Phaser.Scene {
     this.onStroke?.(this.strokes);
     this.strokeLabel.setText(String(this.strokes));
     // Original: snap power to 0.005 steps, velocity = dir * pow(power,1.2)*150.
-    const raw = Math.min(1, v.length() / MAX_DRAG);
-    const snapped = 0.005 * Math.round(raw / 0.005);
-    const power = Math.pow(snapped, POWER_EXP);
-    const dir = v.clone().normalize();
-    const speed = power * MAX_LAUNCH_SPEED;
-    const velocityX = dir.x * speed;
-    const velocityY = dir.y * speed;
+    const launch = this.launchVectorFromDrag(v);
+    if (!launch) return;
     this.moves.push({
       type: 'shot',
       shot: this.strokes,
@@ -1381,16 +1512,16 @@ export class GameScene extends Phaser.Scene {
       y: this.roundPx(this.ball.y),
       dragX: this.roundPx(v.x),
       dragY: this.roundPx(v.y),
-      power: Math.round(power * 10000) / 10000,
-      velocityX: this.roundPx(velocityX),
-      velocityY: this.roundPx(velocityY),
+      power: Math.round(launch.power * 10000) / 10000,
+      velocityX: this.roundPx(launch.velocityX),
+      velocityY: this.roundPx(launch.velocityY),
     });
-    this.ballBody.setLinvel({ x: velocityX, y: velocityY }, true);
+    this.ballBody.setLinvel({ x: launch.velocityX, y: launch.velocityY }, true);
     this.ballBody.setAngvel(0, true);
     this.shotSinceReset = true;
     // Stretch along the launch direction for that satisfying "lunge".
-    this.triggerSquash(Math.atan2(dir.y, dir.x), Math.max(0.35, raw));
-    sound.play('BallHit', 0.3 * raw);
+    this.triggerSquash(Math.atan2(launch.dir.y, launch.dir.x), Math.max(0.35, launch.raw));
+    sound.play('BallHit', 0.3 * launch.raw);
     if (this.trajectoryShots > 0) this.trajectoryShots -= 1;
     this.game.events.emit('powerup-disarmed');
     this.restoreZoom();
