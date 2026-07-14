@@ -111,6 +111,8 @@ function startGame(data: InitResponse, map: RuntimeMap) {
           frameWidth: TILESET.tileWidth,
           frameHeight: TILESET.tileHeight,
         });
+        // Tiling checkerboard backdrop (mirrors the original's background).
+        this.load.image('checkerboard', 'game/textures/checkerboard.png');
       }
       create() {
         this.scene.add('game', GameScene, true, sceneData());

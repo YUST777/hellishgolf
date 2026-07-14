@@ -93,8 +93,8 @@ export class GameScene extends Phaser.Scene {
   /** Cursor CSS strings (image + hotspot) for each interaction state. */
   private static readonly CURSOR = {
     default: 'url(game/cursors/mouse_default.png) 0 0, auto',
-    grab: 'url(game/cursors/hand_open.png) 12 8, grab',
-    shoot: 'url(game/cursors/mouse_shoot.png) 16 16, crosshair',
+    grab: 'url(game/cursors/hand_open.png) 8 6, grab',
+    shoot: 'url(game/cursors/mouse_shoot.png) 8 8, crosshair',
   } as const;
 
   constructor() {
@@ -250,11 +250,11 @@ export class GameScene extends Phaser.Scene {
     const totalW = this.worldW + marginX * 2;
     const totalH = this.worldH + marginY * 2;
 
+    // OUTER background = dirt across the whole padded backdrop.
     this.add
       .rectangle(left, top, totalW, totalH, COLORS.dirt)
       .setOrigin(0, 0)
       .setDepth(-14);
-
     if (this.ensureDirtTexture()) {
       this.add
         .tileSprite(left, top, totalW, totalH, 'dirt')
@@ -262,19 +262,15 @@ export class GameScene extends Phaser.Scene {
         .setDepth(-13);
     }
 
-    const g = this.add.graphics().setDepth(-12);
-    const steps = 40;
-    for (let i = 0; i < steps; i++) {
-      const c = Phaser.Display.Color.Interpolate.ColorWithColor(
-        Phaser.Display.Color.ValueToColor(COLORS.skyTop),
-        Phaser.Display.Color.ValueToColor(COLORS.skyBottom),
-        steps - 1,
-        i
-      );
-      g.fillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b), 1);
-      const yTop = Math.floor((this.worldH * i) / steps);
-      const yBottom = Math.ceil((this.worldH * (i + 1)) / steps);
-      g.fillRect(0, yTop, this.worldW, yBottom - yTop);
+    // INNER background = the checkerboard grid, filling ONLY the map rectangle
+    // (the area the ball plays against), mirroring the original's grid backdrop.
+    if (this.textures.exists('checkerboard')) {
+      const grid = this.add
+        .tileSprite(0, 0, this.worldW, this.worldH, 'checkerboard')
+        .setOrigin(0, 0)
+        .setDepth(-12);
+      grid.tileScaleX = 12.5;
+      grid.tileScaleY = 12.5;
     }
   }
 
