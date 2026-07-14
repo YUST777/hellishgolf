@@ -70,6 +70,8 @@ export class GameScene extends Phaser.Scene {
   private flagCell: { col: number; row: number } | null = null;
   private flagSprite: Phaser.GameObjects.Image | null = null;
   private checkpointDone = false;
+  /** True once a shot has been taken since the last spawn/respawn. */
+  private shotSinceReset = false;
   private finishZone!: Phaser.Geom.Rectangle;
 
   private lastBounceAt = 0;
@@ -121,6 +123,7 @@ export class GameScene extends Phaser.Scene {
     this.flagCell = null;
     this.flagSprite = null;
     this.checkpointDone = false;
+    this.shotSinceReset = false;
     this.accumulator = 0;
     this.groundHandles = new Set();
     this.squashElapsed = 15;
@@ -798,6 +801,7 @@ export class GameScene extends Phaser.Scene {
     const speed = power * MAX_LAUNCH_SPEED;
     this.ballBody.setLinvel({ x: dir.x * speed, y: dir.y * speed }, true);
     this.ballBody.setAngvel(0, true);
+    this.shotSinceReset = true;
     // Stretch along the launch direction for that satisfying "lunge".
     this.triggerSquash(Math.atan2(dir.y, dir.x), Math.max(0.35, raw));
     sound.play('BallHit', 0.3 * raw);
@@ -811,6 +815,9 @@ export class GameScene extends Phaser.Scene {
       { x: this.pxToM(this.respawn.x), y: this.pxToM(this.respawn.y) },
       true
     );
+    // Must take a fresh shot before the hole can be finished again — stops the
+    // ball from insta-winning when it respawns at the flag checkpoint.
+    this.shotSinceReset = false;
   }
 
   // --- loop ---------------------------------------------------------------
@@ -847,7 +854,10 @@ export class GameScene extends Phaser.Scene {
 
     if (this.ball.y > this.worldH + 400) this.resetToRespawn();
 
+    // Win only after a shot has actually been taken since the last spawn or
+    // respawn — otherwise respawning at the flag checkpoint would insta-win.
     if (
+      this.shotSinceReset &&
       Phaser.Geom.Rectangle.Contains(this.finishZone, this.ball.x, this.ball.y) &&
       this.ballResting() &&
       this.isGrounded()
