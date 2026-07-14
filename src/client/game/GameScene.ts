@@ -25,13 +25,7 @@ import {
   ZOOM_LEVELS,
 } from './config';
 import type { RuntimeMap } from '../../shared/tiled';
-import {
-  roleOfGid,
-  rampShapeOfId,
-  cleanGid,
-  isCheckpointGroundId,
-  TILESET,
-} from '../../shared/tiles';
+import { roleOfGid, rampShapeOfId, cleanGid, TILESET } from '../../shared/tiles';
 import { sound } from './sound';
 import { RAPIER } from './physics';
 
@@ -72,8 +66,10 @@ export class GameScene extends Phaser.Scene {
   /** Sensor rects kept in world pixels for cheap per-frame overlap tests. */
   private waterRects: Phaser.Geom.Rectangle[] = [];
   private roughRects: Phaser.Geom.Rectangle[] = [];
-  /** The checkpoint-ground tile the ball last landed on (chime once per). */
-  private lastCheckpointKey = '';
+  /** The checkpoint flag: fires once when the ball reaches it. */
+  private flagCell: { col: number; row: number } | null = null;
+  private flagSprite: Phaser.GameObjects.Image | null = null;
+  private checkpointDone = false;
   private finishZone!: Phaser.Geom.Rectangle;
 
   private lastBounceAt = 0;
@@ -122,7 +118,9 @@ export class GameScene extends Phaser.Scene {
     this.finished = false;
     this.waterRects = [];
     this.roughRects = [];
-    this.lastCheckpointKey = '';
+    this.flagCell = null;
+    this.flagSprite = null;
+    this.checkpointDone = false;
     this.accumulator = 0;
     this.groundHandles = new Set();
     this.squashElapsed = 15;
@@ -316,11 +314,16 @@ export class GameScene extends Phaser.Scene {
         const { x, y } = this.cellCenter(col, row);
 
         // Static (non-animated) tile art, including the recolored lava and the
-        // goal flag (drawn normally, no tint).
-        this.add
+        // walk-through checkpoint flag (drawn normally).
+        const img = this.add
           .image(x, y, 'tileset', frame)
           .setDisplaySize(TILE + 1, TILE + 1)
           .setDepth(5);
+        // The flag (id 153) is the walk-through checkpoint marker.
+        if (cleanGid(gid) - 1 === 153) {
+          this.flagSprite = img;
+          this.flagCell = { col, row };
+        }
       }
     }
   }
@@ -897,38 +900,62 @@ export class GameScene extends Phaser.Scene {
     }
     this.inRough = overRough;
 
-    this.checkCheckpointGround();
+    this.checkFlagCheckpoint();
   }
 
   /**
-   * Checkpoints are the checkpoint-ground tile groups (not the flag). When the
-   * ball comes to rest on top of any checkpoint-ground tile, we save its exact
-   * resting position as the respawn, so a later death returns it right there.
-   * The chime plays once per platform (keyed by the tile column run).
+   * The flag is a walk-through checkpoint. The FIRST time the ball reaches it
+   * (within ~1.5 tiles), it activates ONCE: plays a sound, glows the flag
+   * brightly, and saves the flag's spot as the respawn so a later death returns
+   * the ball here. Never solid — the ball passes through the flag.
    */
-  private checkCheckpointGround() {
-    if (this.infuriating) return;
-    if (this.ballSpeed() > REST_SPEED) return; // only when settled
-
-    const { cols, rows, gids } = this.map;
-    const col = Math.floor(this.ball.x / TILE);
-    // The tile the ball is standing on is just below its feet.
-    const footRow = Math.floor((this.ball.y + BALL_RADIUS) / TILE);
-    if (col < 0 || col >= cols || footRow < 0 || footRow >= rows) return;
-
-    const id = cleanGid(gids[footRow * cols + col] ?? 0) - 1;
-    if (!isCheckpointGroundId(id)) return;
-
-    const key = `${col},${footRow}`;
-    if (key !== this.lastCheckpointKey) {
-      this.lastCheckpointKey = key;
-      sound.play('Chime', 0.2);
-      this.onCheckpoint?.();
-      this.game.events.emit('checkpoint-reached');
-      this.cameras.main.flash(120, 253, 223, 106);
+  private checkFlagCheckpoint() {
+    if (this.infuriating || this.checkpointDone || !this.flagCell) return;
+    const c = this.cellCenter(this.flagCell.col, this.flagCell.row);
+    if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, c.x, c.y) > TILE * 1.5) {
+      return;
     }
-    // Save the ball's current resting spot as the respawn point.
-    this.respawn.set(this.ball.x, this.ball.y);
+    this.checkpointDone = true;
+    // Respawn where the flag stands (ball rests on the platform just below).
+    this.respawn.set(c.x, c.y);
+    sound.play('Chime', 0.5);
+    this.onCheckpoint?.();
+    this.game.events.emit('checkpoint-reached');
+    this.playCheckpointGlow(c.x, c.y);
+  }
+
+  /** One-shot bright glow-up on the flag when the checkpoint activates. */
+  private playCheckpointGlow(x: number, y: number) {
+    // Expanding, fading bright ring.
+    const ring = this.add.circle(x, y, TILE * 0.6, 0xffe066, 0.7).setDepth(7);
+    this.tweens.add({
+      targets: ring,
+      scale: 3,
+      alpha: 0,
+      duration: 500,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    this.cameras.main.flash(160, 253, 223, 106);
+    // Flash the flag bright, then leave it subtly lit.
+    if (this.flagSprite) {
+      const s = this.flagSprite;
+      const baseX = s.scaleX;
+      const baseY = s.scaleY;
+      s.setTint(0xffffff);
+      this.tweens.add({
+        targets: s,
+        scaleX: baseX * 1.4,
+        scaleY: baseY * 1.4,
+        duration: 160,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          s.setScale(baseX, baseY);
+          s.setTint(0xffe9a0); // stays warmly lit = "activated"
+        },
+      });
+    }
   }
 
   /**
