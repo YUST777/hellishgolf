@@ -154,6 +154,25 @@
         right: 12px;
         bottom: 16px;
       }
+      #btn-shop {
+        left: 10px;
+        top: 64px;
+        font-size: 20px;
+      }
+      .shop-coin-badge {
+        position: absolute;
+        right: -7px;
+        bottom: -4px;
+        min-width: 22px;
+        padding: 2px 5px;
+        border-radius: 999px;
+        color: #4a2c17;
+        background: #ffd65a;
+        border: 1px solid #8a4b0f;
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1;
+      }
 
       /* Zoom + mute controls ----------------------------------------------*/
       #zoom-controls {
@@ -195,26 +214,15 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        max-width: calc(100vw - 148px);
+        max-width: calc(100vw - 120px);
         padding: 6px;
         border-radius: 16px;
         background: rgba(0, 0, 0, 0.48);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       }
-      #coin-wallet {
-        min-width: 58px;
-        height: 42px;
-        padding: 0 10px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-        font-weight: 800;
-        color: #4a2c17;
-        background: #ffd65a;
-        border: 2px solid #8a4b0f;
-        box-shadow: inset 0 2px rgba(255, 255, 255, 0.45);
+      #powerup-bar[hidden],
+      .powerup-btn[hidden] {
+        display: none !important;
       }
       .coin-icon {
         width: 14px;
@@ -225,8 +233,8 @@
       }
       .powerup-btn {
         position: relative;
-        width: 70px;
-        height: 52px;
+        width: 58px;
+        height: 48px;
         padding: 6px 6px 5px;
         border: 2px solid rgba(255, 255, 255, 0.18);
         border-radius: 12px;
@@ -246,12 +254,11 @@
       .powerup-btn.can-use {
         border-color: rgba(143, 255, 149, 0.62);
       }
-      .powerup-btn.can-buy {
-        border-color: #ffd65a;
-        background: rgba(74, 44, 23, 0.8);
-      }
-      .powerup-btn.empty:not(.can-buy) {
+      .powerup-btn.empty {
         opacity: 0.62;
+      }
+      .powerup-btn:disabled {
+        cursor: url(game/cursors/mouse_default.png) 0 0, auto;
       }
       .powerup-icon {
         font-size: 21px;
@@ -297,11 +304,6 @@
         text-align: center;
         white-space: nowrap;
       }
-      .powerup-btn.can-buy .powerup-action {
-        color: #4a2c17;
-        background: #ffd65a;
-        border: 1px solid #8a4b0f;
-      }
       .powerup-btn.can-use .powerup-action,
       .powerup-btn.active .powerup-action {
         color: #052e16;
@@ -311,16 +313,11 @@
       @media (max-width: 560px) {
         #powerup-bar {
           bottom: 12px;
-          max-width: calc(100vw - 94px);
+          max-width: calc(100vw - 96px);
           gap: 5px;
         }
-        #coin-wallet {
-          min-width: 48px;
-          height: 38px;
-          padding: 0 8px;
-        }
         .powerup-btn {
-          width: 58px;
+          width: 54px;
           height: 48px;
           padding-inline: 4px;
         }
@@ -529,6 +526,150 @@
         line-height: 1;
       }
 
+      /* Shop --------------------------------------------------------------*/
+      .shop-panel {
+        max-width: 680px;
+      }
+      .shop-wallet {
+        width: max-content;
+        margin: 0 auto 14px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #4a2c17;
+        background: #ffd65a;
+        border: 2px solid #8a4b0f;
+        font-weight: 800;
+        box-shadow: inset 0 2px rgba(255, 255, 255, 0.45);
+      }
+      .shop-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .shop-tab {
+        border: 2px solid #8a4b0f;
+        border-radius: 14px;
+        padding: 9px 12px;
+        color: #4a2c17;
+        background: rgba(255, 214, 90, 0.38);
+        font-weight: 800;
+      }
+      .shop-tab.active {
+        color: #fff;
+        background: #047857;
+        border-color: #034d34;
+      }
+      .shop-section.hidden {
+        display: none;
+      }
+      .shop-grid {
+        display: grid;
+        gap: 10px;
+      }
+      .shop-item {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.38);
+        border: 2px solid rgba(138, 75, 15, 0.28);
+      }
+      .shop-item.equipped {
+        border-color: #047857;
+        background: rgba(143, 255, 149, 0.28);
+      }
+      .shop-item-icon,
+      .shop-swatch {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.62);
+        color: #fff;
+        font-size: 22px;
+        font-weight: 800;
+        box-shadow: inset 0 2px rgba(255, 255, 255, 0.18);
+      }
+      .shop-swatch {
+        border: 2px solid #1a1a1a;
+        background: radial-gradient(circle at 35% 28%, var(--skin-highlight), var(--skin-body) 42%, var(--skin-outline) 100%);
+      }
+      .skin-classic {
+        --skin-body: #ffffff;
+        --skin-highlight: #fff4e5;
+        --skin-outline: #1a1a1a;
+      }
+      .skin-ember {
+        --skin-body: #ff6b1a;
+        --skin-highlight: #fff1a6;
+        --skin-outline: #3b1206;
+      }
+      .skin-slime {
+        --skin-body: #8fff95;
+        --skin-highlight: #e7ffe7;
+        --skin-outline: #052e16;
+      }
+      .skin-gold {
+        --skin-body: #ffd65a;
+        --skin-highlight: #fff7c2;
+        --skin-outline: #4a2c17;
+      }
+      .shop-copy h3 {
+        margin: 0;
+        text-align: left;
+        font-size: 16px;
+      }
+      .shop-copy p {
+        margin: 3px 0 0;
+        text-align: left;
+        font-size: 12px;
+        opacity: 0.82;
+      }
+      .shop-owned {
+        margin-top: 5px;
+        color: #047857;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .shop-action {
+        min-width: 92px;
+        width: auto;
+        margin: 0;
+        padding: 9px 12px;
+        border-radius: 14px;
+        font-size: 12px;
+        letter-spacing: 0.02em;
+      }
+      .shop-action:disabled {
+        opacity: 0.58;
+        transform: none;
+        box-shadow: none;
+      }
+      @media (max-width: 560px) {
+        .overlay {
+          padding: 0.75rem;
+        }
+        .modal-panel.shop-panel {
+          width: 94vw;
+          padding: 18px;
+        }
+        .shop-item {
+          grid-template-columns: auto 1fr;
+        }
+        .shop-action {
+          grid-column: 1 / -1;
+          width: 100%;
+        }
+      }
+
       /* Settings rows ------------------------------------------------------*/
       .setting-row {
         display: flex;
@@ -653,6 +794,10 @@
     <!-- Icon buttons -->
     <button id="btn-menu" class="icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
     <button id="btn-leaderboard" class="icon-btn" title="Leaderboard">&#127942;</button>
+    <button id="btn-shop" class="icon-btn" title="Shop" aria-label="Shop">
+      &#128722;
+      <span class="shop-coin-badge" id="shop-coin-badge">0</span>
+    </button>
 
     <div id="zoom-controls">
       <button id="btn-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
@@ -661,24 +806,20 @@
     </div>
 
     <div id="powerup-bar" aria-label="Powerups">
-      <div id="coin-wallet" title="Coins">
-        <span class="coin-icon"></span>
-        <span id="wallet-coins">0</span>
-      </div>
-      <button class="powerup-btn" data-powerup="trajectory" title="Trajectory" aria-label="Trajectory powerup">
+      <button class="powerup-btn" data-powerup="trajectory" title="No Trajectory owned" aria-label="No Trajectory owned" disabled>
         <span class="powerup-icon">&#10022;</span>
-        <span class="powerup-count" id="powerup-trajectory-count">0</span>
-        <span class="powerup-action" id="powerup-trajectory-action">BUY 3</span>
+        <span class="powerup-count" id="powerup-trajectory-count">x0</span>
+        <span class="powerup-action" id="powerup-trajectory-action">USE</span>
       </button>
-      <button class="powerup-btn" data-powerup="sticky" title="Sticky slime" aria-label="Sticky slime powerup">
+      <button class="powerup-btn" data-powerup="sticky" title="No Sticky Slime owned" aria-label="No Sticky Slime owned" disabled>
         <span class="powerup-icon">&#9679;</span>
-        <span class="powerup-count" id="powerup-sticky-count">0</span>
-        <span class="powerup-action" id="powerup-sticky-action">BUY 6</span>
+        <span class="powerup-count" id="powerup-sticky-count">x0</span>
+        <span class="powerup-action" id="powerup-sticky-action">USE</span>
       </button>
-      <button class="powerup-btn" data-powerup="checkpoint" title="Checkpoint generator" aria-label="Checkpoint generator powerup">
+      <button class="powerup-btn" data-powerup="checkpoint" title="No Checkpoint owned" aria-label="No Checkpoint owned" disabled>
         <span class="powerup-icon">&#9873;</span>
-        <span class="powerup-count" id="powerup-checkpoint-count">0</span>
-        <span class="powerup-action" id="powerup-checkpoint-action">BUY 10</span>
+        <span class="powerup-count" id="powerup-checkpoint-count">x0</span>
+        <span class="powerup-action" id="powerup-checkpoint-action">USE</span>
       </button>
     </div>
 
@@ -697,10 +838,100 @@
           <div class="menu-list">
             <button class="modal-button" id="menu-resume">Resume</button>
             <button class="modal-button" id="menu-return">Return to Checkpoint</button>
+            <button class="modal-button" id="menu-shop">Shop</button>
             <button class="modal-button" id="menu-leaderboard">Leaderboard</button>
             <button class="modal-button secondary" id="menu-settings">Settings</button>
             <button class="modal-button warning" id="menu-reset">Reset Hole</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop -->
+    <div class="overlay hidden" id="shop-overlay">
+      <div class="modal-panel-outer">
+        <div class="modal-panel shop-panel" style="position: relative">
+          <button class="modal-close" id="btn-shop-close" title="Close">&times;</button>
+          <h2>Shop</h2>
+          <div class="shop-wallet" title="Coins">
+            <span class="coin-icon"></span>
+            <span id="shop-wallet-coins">0</span>
+          </div>
+          <div class="shop-tabs" role="tablist">
+            <button class="shop-tab active" data-shop-tab="powerups" id="shop-tab-powerups">Powerups</button>
+            <button class="shop-tab" data-shop-tab="skins" id="shop-tab-skins">Skins</button>
+          </div>
+          <section class="shop-section" id="shop-powerups">
+            <div class="shop-grid">
+              <div class="shop-item" id="shop-powerup-trajectory">
+                <div class="shop-item-icon">&#10022;</div>
+                <div class="shop-copy">
+                  <h3>Trajectory</h3>
+                  <p>Aim preview for one shot.</p>
+                  <div class="shop-owned" id="shop-powerup-trajectory-owned">x0 owned</div>
+                </div>
+                <button class="modal-button shop-action" id="shop-buy-powerup-trajectory">BUY 3</button>
+              </div>
+              <div class="shop-item" id="shop-powerup-sticky">
+                <div class="shop-item-icon">&#9679;</div>
+                <div class="shop-copy">
+                  <h3>Sticky Slime</h3>
+                  <p>Place slime on a wall.</p>
+                  <div class="shop-owned" id="shop-powerup-sticky-owned">x0 owned</div>
+                </div>
+                <button class="modal-button shop-action" id="shop-buy-powerup-sticky">BUY 6</button>
+              </div>
+              <div class="shop-item" id="shop-powerup-checkpoint">
+                <div class="shop-item-icon">&#9873;</div>
+                <div class="shop-copy">
+                  <h3>Checkpoint</h3>
+                  <p>Create one safe return flag.</p>
+                  <div class="shop-owned" id="shop-powerup-checkpoint-owned">x0 owned</div>
+                </div>
+                <button class="modal-button shop-action" id="shop-buy-powerup-checkpoint">BUY 10</button>
+              </div>
+            </div>
+          </section>
+          <section class="shop-section hidden" id="shop-skins">
+            <div class="shop-grid">
+              <div class="shop-item" id="shop-skin-classic">
+                <div class="shop-swatch skin-classic"></div>
+                <div class="shop-copy">
+                  <h3>Classic</h3>
+                  <p>Clean white golf ball.</p>
+                  <div class="shop-owned" id="shop-skin-classic-owned">Owned</div>
+                </div>
+                <button class="modal-button shop-action" id="shop-skin-classic-action">EQUIPPED</button>
+              </div>
+              <div class="shop-item" id="shop-skin-ember">
+                <div class="shop-swatch skin-ember"></div>
+                <div class="shop-copy">
+                  <h3>Ember</h3>
+                  <p>Hot lava orange.</p>
+                  <div class="shop-owned" id="shop-skin-ember-owned">18 coins</div>
+                </div>
+                <button class="modal-button shop-action" id="shop-skin-ember-action">BUY 18</button>
+              </div>
+              <div class="shop-item" id="shop-skin-slime">
+                <div class="shop-swatch skin-slime"></div>
+                <div class="shop-copy">
+                  <h3>Slime</h3>
+                  <p>Bright sticky green.</p>
+                  <div class="shop-owned" id="shop-skin-slime-owned">22 coins</div>
+                </div>
+                <button class="modal-button shop-action" id="shop-skin-slime-action">BUY 22</button>
+              </div>
+              <div class="shop-item" id="shop-skin-gold">
+                <div class="shop-swatch skin-gold"></div>
+                <div class="shop-copy">
+                  <h3>Gold</h3>
+                  <p>Shiny coin flex.</p>
+                  <div class="shop-owned" id="shop-skin-gold-owned">35 coins</div>
+                </div>
+                <button class="modal-button shop-action" id="shop-skin-gold-action">BUY 35</button>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>

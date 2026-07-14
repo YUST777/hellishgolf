@@ -17,16 +17,20 @@ import { parseTiledMap, type RuntimeMap } from '../../shared/tiled';
 import { TILESET } from '../../shared/tiles';
 import type { InitResponse, LeaderboardResponse, ReplayMove } from '../../shared/types';
 import {
+  BALL_SKINS,
   POWERUP_NAMES,
   POWERUP_ORDER,
   POWERUP_PRICES,
   buyPowerup,
+  buySkin,
   collectCoin,
   collectedCoinIds,
   consumePowerup,
+  equipSkin,
   grantCoins,
   loadPowerupState,
   savePowerupState,
+  type BallSkinId,
   type PowerupKind,
 } from './powerups';
 
@@ -64,12 +68,25 @@ const el = <T extends HTMLElement>(id: string): T => {
   return node as T;
 };
 
+function textIfPresent(id: string, value: string) {
+  const node = document.getElementById(id);
+  if (node) node.textContent = value;
+}
+
 let game: Phaser.Game | null = null;
 let init: InitResponse | null = null;
 let runtimeMap: RuntimeMap | null = null;
 let powerups = loadPowerupState();
 let toastTimer: number | null = null;
 let activePowerup: PowerupKind | null = null;
+type ShopTab = 'powerups' | 'skins';
+let activeShopTab: ShopTab = 'powerups';
+
+const POWERUP_DESCRIPTIONS: Record<PowerupKind, string> = {
+  trajectory: 'Aim preview for one shot.',
+  sticky: 'Place slime on a wall.',
+  checkpoint: 'Create one safe return flag.',
+};
 
 function setHud(strokes: number, best: number | null, streak: number) {
   el('hud-strokes').textContent = String(strokes);
@@ -86,44 +103,40 @@ function toast(message: string) {
 }
 
 function updatePowerupHud() {
-  el('wallet-coins').textContent = String(powerups.coins);
+  textIfPresent('shop-coin-badge', String(powerups.coins));
+  textIfPresent('shop-wallet-coins', String(powerups.coins));
+  let hasQuickUse = false;
   for (const kind of POWERUP_ORDER) {
     const count = powerups.inventory[kind];
-    const price = POWERUP_PRICES[kind];
-    const canBuy = count === 0 && powerups.coins >= price;
     const canUse = count > 0;
     const isActive = activePowerup === kind;
+    const showQuickUse = canUse || isActive;
     const button = document.querySelector<HTMLButtonElement>(
       `.powerup-btn[data-powerup="${kind}"]`
     );
     const countNode = document.getElementById(`powerup-${kind}-count`);
     const actionNode = document.getElementById(`powerup-${kind}-action`);
     if (countNode) countNode.textContent = `x${count}`;
-    if (actionNode) {
-      actionNode.textContent = isActive
-        ? 'READY'
-        : canUse
-          ? 'USE'
-          : canBuy
-            ? `BUY ${price}`
-            : `NEED ${price}`;
-    }
+    if (actionNode) actionNode.textContent = isActive ? 'READY' : 'USE';
     if (button) {
-      button.classList.toggle('can-buy', canBuy);
+      button.hidden = !showQuickUse;
       button.classList.toggle('can-use', canUse);
       button.classList.toggle('empty', count === 0);
       button.classList.toggle('active', isActive);
+      button.disabled = !canUse && !isActive;
       button.title =
         isActive
           ? `${POWERUP_NAMES[kind]} ready`
           : canUse
             ? `Use ${POWERUP_NAMES[kind]}`
-            : canBuy
-              ? `Buy ${POWERUP_NAMES[kind]} for ${price} coins`
-              : `Need ${price} coins for ${POWERUP_NAMES[kind]}`;
+            : `No ${POWERUP_NAMES[kind]} owned`;
       button.setAttribute('aria-label', button.title);
     }
+    hasQuickUse ||= showQuickUse;
   }
+  const quickBar = document.getElementById('powerup-bar');
+  if (quickBar) quickBar.hidden = !hasQuickUse;
+  updateShop();
 }
 
 function setActivePowerup(kind: PowerupKind | null) {
@@ -145,15 +158,113 @@ function requestPowerup(kind: PowerupKind) {
     setActivePowerup(null);
   }
   if (powerups.inventory[kind] <= 0) {
-    if (buyPowerup(powerups, kind)) {
-      updatePowerupHud();
-      toast(`${POWERUP_NAMES[kind]} bought`);
-    } else {
-      toast(`Need ${POWERUP_PRICES[kind]} coins`);
-    }
+    toast(`Buy ${POWERUP_NAMES[kind]} in the shop`);
+    openShop('powerups');
     return;
   }
   game?.events.emit('powerup-request', kind);
+}
+
+function setShopTab(tab: ShopTab) {
+  activeShopTab = tab;
+  document.querySelectorAll<HTMLButtonElement>('.shop-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.shopTab === tab);
+  });
+  document.querySelectorAll<HTMLElement>('.shop-section').forEach((section) => {
+    section.classList.toggle('hidden', section.id !== `shop-${tab}`);
+  });
+}
+
+function openShop(tab: ShopTab = activeShopTab) {
+  setShopTab(tab);
+  updateShop();
+  show('shop-overlay');
+}
+
+function updateShop() {
+  textIfPresent('shop-wallet-coins', String(powerups.coins));
+  textIfPresent('shop-coin-badge', String(powerups.coins));
+
+  for (const kind of POWERUP_ORDER) {
+    const price = POWERUP_PRICES[kind];
+    const count = powerups.inventory[kind];
+    const canBuy = powerups.coins >= price;
+    const item = document.getElementById(`shop-powerup-${kind}`);
+    const button = document.getElementById(
+      `shop-buy-powerup-${kind}`
+    ) as HTMLButtonElement | null;
+    const copy = item?.querySelector<HTMLParagraphElement>('p');
+    textIfPresent(`shop-powerup-${kind}-owned`, `x${count} owned`);
+    if (copy) copy.textContent = POWERUP_DESCRIPTIONS[kind];
+    item?.classList.toggle('locked', !canBuy);
+    if (button) {
+      button.textContent = canBuy ? `BUY ${price}` : `NEED ${price}`;
+      button.disabled = !canBuy;
+      button.title = canBuy
+        ? `Buy ${POWERUP_NAMES[kind]} for ${price} coins`
+        : `Need ${price} coins for ${POWERUP_NAMES[kind]}`;
+    }
+  }
+
+  for (const skin of BALL_SKINS) {
+    const owned = powerups.skins.owned.includes(skin.id);
+    const equipped = powerups.skins.equipped === skin.id;
+    const canBuy = powerups.coins >= skin.price;
+    const item = document.getElementById(`shop-skin-${skin.id}`);
+    const button = document.getElementById(
+      `shop-skin-${skin.id}-action`
+    ) as HTMLButtonElement | null;
+    item?.classList.toggle('equipped', equipped);
+    item?.classList.toggle('locked', !owned && !canBuy);
+    textIfPresent(
+      `shop-skin-${skin.id}-owned`,
+      equipped ? 'Equipped' : owned ? 'Owned' : `${skin.price} coins`
+    );
+    if (button) {
+      button.textContent = equipped
+        ? 'EQUIPPED'
+        : owned
+          ? 'EQUIP'
+          : canBuy
+            ? `BUY ${skin.price}`
+            : `NEED ${skin.price}`;
+      button.disabled = equipped || (!owned && !canBuy);
+      button.classList.toggle('secondary', owned && !equipped);
+      button.title = equipped
+        ? `${skin.name} equipped`
+        : owned
+          ? `Equip ${skin.name}`
+          : canBuy
+            ? `Buy ${skin.name} for ${skin.price} coins`
+            : `Need ${skin.price} coins for ${skin.name}`;
+    }
+  }
+}
+
+function buyPowerupFromShop(kind: PowerupKind) {
+  if (buyPowerup(powerups, kind)) {
+    updatePowerupHud();
+    toast(`${POWERUP_NAMES[kind]} bought`);
+  } else {
+    toast(`Need ${POWERUP_PRICES[kind]} coins`);
+  }
+}
+
+function chooseSkin(skinId: BallSkinId) {
+  const skin = BALL_SKINS.find((item) => item.id === skinId);
+  if (!skin) return;
+  const owned = powerups.skins.owned.includes(skinId);
+  if (owned) {
+    if (!equipSkin(powerups, skinId)) return;
+    toast(`${skin.name} equipped`);
+  } else if (buySkin(powerups, skinId)) {
+    toast(`${skin.name} bought`);
+  } else {
+    toast(`Need ${skin.price} coins`);
+    return;
+  }
+  game?.events.emit('skin-changed', powerups.skins.equipped);
+  updatePowerupHud();
 }
 
 function canUseTestCoins(data?: InitResponse): boolean {
@@ -200,6 +311,7 @@ function sceneData() {
     dateKey,
     mapId,
     collectedCoinIds: collectedCoinIds(powerups, dateKey, mapId),
+    ballSkin: powerups.skins.equipped,
     zoom: readZoom(),
     infuriating: readInfuriating(),
     onStroke: (n: number) => setHud(n, init?.bestToday ?? null, init?.streak ?? 0),
@@ -383,6 +495,7 @@ function retry() {
   setActivePowerup(null);
   hide('result-overlay');
   hide('menu-overlay');
+  hide('shop-overlay');
   hide('reset-overlay');
   stopCountdown();
   el('return-button').classList.remove('show');
@@ -444,6 +557,20 @@ function wireUi() {
     document
       .querySelector<HTMLButtonElement>(`.powerup-btn[data-powerup="${kind}"]`)
       ?.addEventListener('click', () => requestPowerup(kind));
+    el<HTMLButtonElement>(`shop-buy-powerup-${kind}`).addEventListener('click', () =>
+      buyPowerupFromShop(kind)
+    );
+  });
+  BALL_SKINS.forEach((skin) => {
+    el<HTMLButtonElement>(`shop-skin-${skin.id}-action`).addEventListener('click', () =>
+      chooseSkin(skin.id)
+    );
+  });
+  document.querySelectorAll<HTMLButtonElement>('.shop-tab').forEach((button) => {
+    button.addEventListener('click', () => {
+      const tab = button.dataset.shopTab;
+      if (tab === 'powerups' || tab === 'skins') setShopTab(tab);
+    });
   });
   updatePowerupHud();
 
@@ -452,12 +579,18 @@ function wireUi() {
   el('btn-result-leaderboard').addEventListener('click', openLeaderboard);
 
   // Menu.
+  el('btn-shop').addEventListener('click', () => openShop());
+  el('btn-shop-close').addEventListener('click', () => hide('shop-overlay'));
   el('btn-menu').addEventListener('click', () => {
     sound.play('Back', 0.5);
     show('menu-overlay');
   });
   el('btn-menu-close').addEventListener('click', () => hide('menu-overlay'));
   el('menu-resume').addEventListener('click', () => hide('menu-overlay'));
+  el('menu-shop').addEventListener('click', () => {
+    hide('menu-overlay');
+    openShop();
+  });
   el('menu-leaderboard').addEventListener('click', () => {
     hide('menu-overlay');
     openLeaderboard();

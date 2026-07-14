@@ -37,7 +37,7 @@ import {
 } from '../../shared/tiles';
 import { sound } from './sound';
 import { RAPIER } from './physics';
-import type { PowerupKind } from './powerups';
+import { getBallSkin, type BallSkinId, type PowerupKind } from './powerups';
 
 type CheckpointZone = {
   rect: Phaser.Geom.Rectangle;
@@ -101,6 +101,7 @@ export class GameScene extends Phaser.Scene {
   private dateKey = '';
   private mapId = 0;
   private collectedCoinIds = new Set<string>();
+  private ballSkin: BallSkinId = 'classic';
 
   private respawn = new Phaser.Math.Vector2();
   /** The spawn/tee, used as the fallback respawn before any checkpoint. */
@@ -159,6 +160,7 @@ export class GameScene extends Phaser.Scene {
     dateKey?: string;
     mapId?: number;
     collectedCoinIds?: string[];
+    ballSkin?: BallSkinId;
     zoom?: number;
     infuriating?: boolean;
     onStroke?: (n: number) => void;
@@ -170,6 +172,7 @@ export class GameScene extends Phaser.Scene {
     this.dateKey = data.dateKey ?? '';
     this.mapId = data.mapId ?? 0;
     this.collectedCoinIds = new Set(data.collectedCoinIds ?? []);
+    this.ballSkin = data.ballSkin ?? 'classic';
     this.zoom = data.zoom ?? DEFAULT_ZOOM;
     this.infuriating = data.infuriating ?? false;
     this.onStroke = data.onStroke;
@@ -269,6 +272,7 @@ export class GameScene extends Phaser.Scene {
     this.setupZoom();
     this.setupMenuBridge();
     this.setupPowerupBridge();
+    this.setupShopBridge();
     sound.init();
 
     this.input.setDefaultCursor(GameScene.CURSOR.default);
@@ -331,6 +335,14 @@ export class GameScene extends Phaser.Scene {
       }
     });
     this.onGameEvent('powerup-cancel', () => this.disarmPowerup());
+  }
+
+  private setupShopBridge() {
+    this.onGameEvent('skin-changed', (skinId) => {
+      const skin = getBallSkin(skinId);
+      this.ballSkin = skin.id;
+      this.applyBallSkin();
+    });
   }
 
   private requestPowerup(kind: PowerupKind) {
@@ -890,7 +902,7 @@ export class GameScene extends Phaser.Scene {
     this.ballCollider = this.world.createCollider(colDesc, this.ballBody);
 
     this.ensureBallTexture();
-    this.ball = this.add.image(this.respawn.x, this.respawn.y, 'hgball').setDepth(40);
+    this.ball = this.add.image(this.respawn.x, this.respawn.y, this.ballTextureKey()).setDepth(40);
     this.strokeLabel = this.add
       .text(this.ball.x, this.ball.y - BALL_VISUAL_RADIUS - 10, '0', {
         fontFamily: '"Comic Neue", "Comic Sans MS", system-ui, sans-serif',
@@ -909,8 +921,19 @@ export class GameScene extends Phaser.Scene {
    * outline, an offset drop shadow, a soft warm highlight upper-left, and a few
    * dimples. Drawn once into a reusable texture.
    */
+  private ballTextureKey(): string {
+    return `hgball-${this.ballSkin}`;
+  }
+
+  private applyBallSkin() {
+    this.ensureBallTexture();
+    if (this.ball) this.ball.setTexture(this.ballTextureKey());
+  }
+
   private ensureBallTexture() {
-    if (this.textures.exists('hgball')) return;
+    const key = this.ballTextureKey();
+    if (this.textures.exists(key)) return;
+    const skin = getBallSkin(this.ballSkin);
     const R = BALL_VISUAL_RADIUS;
     const pad = 6;
     const c = R + pad; // texture centre
@@ -923,16 +946,16 @@ export class GameScene extends Phaser.Scene {
     // Dark base ring / outline backing.
     g.fillStyle(0x000000, 0.7);
     g.fillCircle(c, c, R + 1);
-    // White body.
-    g.fillStyle(0xffffff, 1);
+    // Skin body.
+    g.fillStyle(skin.body, 1);
     g.fillCircle(c, c, R);
     // Soft warm highlights upper-left (kept small so they stay on the ball).
-    g.fillStyle(0xfff4e5, 0.18);
+    g.fillStyle(skin.highlight, 0.22);
     g.fillCircle(c - 6, c - 6, R * 0.55);
-    g.fillStyle(0xfff4e5, 0.15);
+    g.fillStyle(skin.highlight, 0.18);
     g.fillCircle(c - 6.3, c - 6.3, R * 0.38);
     // Dimples.
-    g.fillStyle(0xe6e6e6, 0.9);
+    g.fillStyle(skin.dimple, 0.9);
     const dimples = [
       { x: 4, y: 6 },
       { x: -7, y: 3 },
@@ -944,10 +967,10 @@ export class GameScene extends Phaser.Scene {
     ];
     for (const d of dimples) g.fillCircle(c + d.x, c + d.y, 1.1);
     // Outline.
-    g.lineStyle(2, 0x1a1a1a, 1);
+    g.lineStyle(2, skin.outline, 1);
     g.strokeCircle(c, c, R);
 
-    g.generateTexture('hgball', size, size);
+    g.generateTexture(key, size, size);
     g.destroy();
   }
 
