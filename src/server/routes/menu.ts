@@ -17,7 +17,7 @@ menu.post("/post-create", async (c) => {
   } catch (error) {
     console.error(`Error creating post: ${error}`);
     return c.json<UiResponse>(
-      { showToast: "Failed to create Peak Putt post" },
+      { showToast: "Failed to create Hellish Golf post" },
       400,
     );
   }

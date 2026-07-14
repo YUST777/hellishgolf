@@ -1,4 +1,4 @@
--- Peak Putt Supabase schema.
+-- Hellish Golf Supabase schema.
 -- Run this in the Supabase SQL Editor if you want to create the tables manually.
 -- The Devvit server also runs this shape automatically when DB env is configured.
 

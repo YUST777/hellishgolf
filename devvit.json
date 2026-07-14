@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "peak-putt",
+  "name": "hellishgolf",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
@@ -70,8 +70,8 @@
   "menu": {
     "items": [
       {
-        "label": "New Peak Putt hole",
-        "description": "Create a new Peak Putt daily-style post",
+        "label": "New Hellish Golf hole",
+        "description": "Create a new Hellish Golf daily-style post",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"

@@ -1,4 +1,4 @@
-// Local preview harness for the Peak Putt client.
+// Local preview harness for the Hellish Golf client.
 //
 // Devvit apps normally run inside Reddit via `devvit playtest`, which needs a
 // Reddit login and injects the real /api server. This script lets you play the
@@ -253,6 +253,6 @@ try {
 }
 
 server.listen(PORT, () => {
-  console.log(`Peak Putt preview running at http://localhost:${PORT}/`);
+  console.log(`Hellish Golf preview running at http://localhost:${PORT}/`);
   console.log("(mocked /api — real data only works via `devvit playtest`)");
 });

@@ -2,7 +2,7 @@ import { context, reddit } from "@devvit/web/server";
 import { getDailyInfo, normalizeMapId, setPostMap } from "./daily";
 
 /**
- * Create a new Peak Putt post. If a `seed` is provided (user-generated hole),
+ * Create a new Hellish Golf post. If a `seed` is provided (user-generated hole),
  * the post is pinned to that seed; otherwise it snapshots today's daily hole.
  */
 export async function createPost(opts?: { mapId?: number; title?: string }) {
@@ -10,7 +10,7 @@ export async function createPost(opts?: { mapId?: number; title?: string }) {
   const mapId = normalizeMapId(opts?.mapId, daily.mapId);
   const title =
     opts?.title ??
-    `Peak Putt \u2014 Hole #${daily.holeNumber} (${daily.dateKey})`;
+    `Hellish Golf \u2014 Hole #${daily.holeNumber} (${daily.dateKey})`;
 
   const post = await reddit.submitCustomPost({
     title,

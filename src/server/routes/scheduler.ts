@@ -13,7 +13,7 @@ scheduler.post("/daily-hole", async (c) => {
   try {
     const daily = getDailyInfo();
     const post = await reddit.submitCustomPost({
-      title: `Peak Putt \u2014 Hole #${daily.holeNumber} (${daily.dateKey})`,
+      title: `Hellish Golf \u2014 Hole #${daily.holeNumber} (${daily.dateKey})`,
       subredditName: context.subredditName,
     });
     await setPostMap(post.id, daily.mapId);
