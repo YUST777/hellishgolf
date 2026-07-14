@@ -16,6 +16,17 @@ import { mapUrl } from '../../shared/mapManifest';
 import { parseTiledMap, type RuntimeMap } from '../../shared/tiled';
 import { TILESET } from '../../shared/tiles';
 import type { InitResponse, LeaderboardResponse, ReplayMove } from '../../shared/types';
+import {
+  POWERUP_NAMES,
+  POWERUP_ORDER,
+  POWERUP_PRICES,
+  buyPowerup,
+  collectCoin,
+  collectedCoinIds,
+  consumePowerup,
+  loadPowerupState,
+  type PowerupKind,
+} from './powerups';
 
 /** Read the persisted discrete zoom preference (defaults to 1). */
 function readZoom(): number {
@@ -54,11 +65,70 @@ const el = <T extends HTMLElement>(id: string): T => {
 let game: Phaser.Game | null = null;
 let init: InitResponse | null = null;
 let runtimeMap: RuntimeMap | null = null;
+let powerups = loadPowerupState();
+let toastTimer: number | null = null;
 
 function setHud(strokes: number, best: number | null, streak: number) {
   el('hud-strokes').textContent = String(strokes);
   el('hud-best').textContent = best == null ? '\u2014' : String(best);
   el('hud-streak').textContent = streak > 0 ? `\uD83D\uDD25 ${streak}` : '\u2014';
+}
+
+function toast(message: string) {
+  const node = el('toast');
+  node.textContent = message;
+  node.classList.add('show');
+  if (toastTimer !== null) window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => node.classList.remove('show'), 1500);
+}
+
+function updatePowerupHud() {
+  el('wallet-coins').textContent = String(powerups.coins);
+  for (const kind of POWERUP_ORDER) {
+    const count = powerups.inventory[kind];
+    const button = document.querySelector<HTMLButtonElement>(
+      `.powerup-btn[data-powerup="${kind}"]`
+    );
+    const countNode = document.getElementById(`powerup-${kind}-count`);
+    const priceNode = document.getElementById(`powerup-${kind}-price`);
+    if (countNode) countNode.textContent = String(count);
+    if (priceNode) priceNode.textContent = String(POWERUP_PRICES[kind]);
+    if (button) {
+      button.classList.toggle('can-buy', count === 0 && powerups.coins >= POWERUP_PRICES[kind]);
+      button.classList.toggle('empty', count === 0);
+      button.title =
+        count > 0
+          ? `Use ${POWERUP_NAMES[kind]}`
+          : `Buy ${POWERUP_NAMES[kind]} for ${POWERUP_PRICES[kind]} coins`;
+    }
+  }
+}
+
+function setActivePowerup(kind: PowerupKind | null) {
+  document.querySelectorAll<HTMLButtonElement>('.powerup-btn').forEach((button) => {
+    button.classList.toggle('active', button.dataset.powerup === kind);
+  });
+}
+
+function onCoinCollected(coinId: string) {
+  if (!init) return;
+  if (collectCoin(powerups, init.daily.dateKey, init.mapId, coinId)) {
+    updatePowerupHud();
+    toast('+1 coin');
+  }
+}
+
+function requestPowerup(kind: PowerupKind) {
+  if (powerups.inventory[kind] <= 0) {
+    if (buyPowerup(powerups, kind)) {
+      updatePowerupHud();
+      toast(`${POWERUP_NAMES[kind]} bought`);
+    } else {
+      toast(`Need ${POWERUP_PRICES[kind]} coins`);
+    }
+    return;
+  }
+  game?.events.emit('powerup-request', kind);
 }
 
 /** Load the raw Tiled JSON for a map id and parse it into the runtime model. */
@@ -70,13 +140,19 @@ async function loadMap(mapId: number): Promise<RuntimeMap> {
 }
 
 function sceneData() {
+  const dateKey = init?.daily.dateKey ?? '';
+  const mapId = init?.mapId ?? 0;
   return {
     map: runtimeMap!,
+    dateKey,
+    mapId,
+    collectedCoinIds: collectedCoinIds(powerups, dateKey, mapId),
     zoom: readZoom(),
     infuriating: readInfuriating(),
     onStroke: (n: number) => setHud(n, init?.bestToday ?? null, init?.streak ?? 0),
     // The checkpoint banner is driven by the 'checkpoint-reached' scene event.
     onCheckpoint: () => {},
+    onCoinCollected: (coinId: string) => onCoinCollected(coinId),
     onFinish: (strokes: number, timeMs: number, moves: ReplayMove[]) =>
       onFinish(strokes, timeMs, moves),
   };
@@ -89,6 +165,7 @@ function startGame(data: InitResponse, map: RuntimeMap) {
   el('loading').classList.add('hidden');
 
   setHud(0, data.bestToday, data.streak);
+  updatePowerupHud();
   el('hole-number').textContent = `#${data.daily.holeNumber}`;
   el('hole-date').textContent = data.daily.dateKey;
 
@@ -308,6 +385,13 @@ function openLeaderboard() {
 }
 
 function wireUi() {
+  POWERUP_ORDER.forEach((kind) => {
+    document
+      .querySelector<HTMLButtonElement>(`.powerup-btn[data-powerup="${kind}"]`)
+      ?.addEventListener('click', () => requestPowerup(kind));
+  });
+  updatePowerupHud();
+
   // Result modal.
   el('btn-retry').addEventListener('click', retry);
   el('btn-result-leaderboard').addEventListener('click', openLeaderboard);
@@ -397,6 +481,15 @@ function wireGameEvents() {
     alert.classList.add('show');
     window.setTimeout(() => alert.classList.remove('show'), 1600);
   });
+  game.events.on('powerup-consumed', (kind: PowerupKind) => {
+    if (consumePowerup(powerups, kind)) updatePowerupHud();
+    if (kind === 'sticky') toast('Slime placed');
+    else if (kind === 'checkpoint') toast('Checkpoint created');
+  });
+  game.events.on('powerup-ready', (message: string) => toast(message));
+  game.events.on('powerup-failed', (message: string) => toast(message));
+  game.events.on('powerup-armed', (kind: PowerupKind) => setActivePowerup(kind));
+  game.events.on('powerup-disarmed', () => setActivePowerup(null));
 }
 
 async function main() {

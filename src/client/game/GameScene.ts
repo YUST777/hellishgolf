@@ -37,6 +37,7 @@ import {
 } from '../../shared/tiles';
 import { sound } from './sound';
 import { RAPIER } from './physics';
+import type { PowerupKind } from './powerups';
 
 type CheckpointZone = {
   rect: Phaser.Geom.Rectangle;
@@ -51,6 +52,18 @@ type CheckpointZone = {
 type CheckpointFlagMarker = {
   sprite: Phaser.GameObjects.Image;
   rank: number;
+};
+
+type CoinPickup = {
+  id: string;
+  sprite: Phaser.GameObjects.Image;
+  x: number;
+  y: number;
+};
+
+type SlimePatch = {
+  circle: Phaser.Geom.Circle;
+  gfx: Phaser.GameObjects.Graphics;
 };
 
 /**
@@ -71,9 +84,11 @@ export class GameScene extends Phaser.Scene {
   private accumulator = 0;
 
   private ball!: Phaser.GameObjects.Image;
+  private strokeLabel!: Phaser.GameObjects.Text;
   private aiming = false;
   private aimStart = 0;
   private aimGfx!: Phaser.GameObjects.Graphics;
+  private trajectoryGfx!: Phaser.GameObjects.Graphics;
 
   private zoom = DEFAULT_ZOOM;
   private infuriating = false;
@@ -83,6 +98,9 @@ export class GameScene extends Phaser.Scene {
   private startTime = 0;
   private finished = false;
   private moves: ReplayMove[] = [];
+  private dateKey = '';
+  private mapId = 0;
+  private collectedCoinIds = new Set<string>();
 
   private respawn = new Phaser.Math.Vector2();
   /** The spawn/tee, used as the fallback respawn before any checkpoint. */
@@ -96,6 +114,12 @@ export class GameScene extends Phaser.Scene {
   private bestCheckpointRank = -1;
   /** Checkpoint flags are visual only; activation comes from the ground. */
   private checkpointFlagMarkers: CheckpointFlagMarker[] = [];
+  private coins: CoinPickup[] = [];
+  private slimePatches: SlimePatch[] = [];
+  private pendingPowerup: PowerupKind | null = null;
+  private trajectoryShots = 0;
+  private generatedCheckpointUsed = false;
+  private stickyAnchor: Phaser.Math.Vector2 | null = null;
   /** True once a shot has been taken since the last spawn/respawn. */
   private shotSinceReset = false;
   private finishZone!: Phaser.Geom.Rectangle;
@@ -112,10 +136,12 @@ export class GameScene extends Phaser.Scene {
   /** Current damping/restitution so we only push changes to Rapier on switch. */
   private curDamping = BALL_LINEAR_DAMPING;
   private curRestitution = BALL_RESTITUTION;
+  private cleanupGameEvents: Array<() => void> = [];
 
   private onStroke?: (n: number) => void;
   private onFinish?: (n: number, t: number, moves: ReplayMove[]) => void;
   private onCheckpoint?: () => void;
+  private onCoinCollected?: (id: string) => void;
 
   /** Cursor CSS strings (image + hotspot) for each interaction state. */
   private static readonly CURSOR = {
@@ -130,18 +156,26 @@ export class GameScene extends Phaser.Scene {
 
   init(data: {
     map: RuntimeMap;
+    dateKey?: string;
+    mapId?: number;
+    collectedCoinIds?: string[];
     zoom?: number;
     infuriating?: boolean;
     onStroke?: (n: number) => void;
     onFinish?: (n: number, t: number, moves: ReplayMove[]) => void;
     onCheckpoint?: () => void;
+    onCoinCollected?: (id: string) => void;
   }) {
     this.map = data.map;
+    this.dateKey = data.dateKey ?? '';
+    this.mapId = data.mapId ?? 0;
+    this.collectedCoinIds = new Set(data.collectedCoinIds ?? []);
     this.zoom = data.zoom ?? DEFAULT_ZOOM;
     this.infuriating = data.infuriating ?? false;
     this.onStroke = data.onStroke;
     this.onFinish = data.onFinish;
     this.onCheckpoint = data.onCheckpoint;
+    this.onCoinCollected = data.onCoinCollected;
     this.strokes = 0;
     this.moves = [];
     this.finished = false;
@@ -151,6 +185,12 @@ export class GameScene extends Phaser.Scene {
     this.activatedCheckpointRanks = new Set();
     this.bestCheckpointRank = -1;
     this.checkpointFlagMarkers = [];
+    this.coins = [];
+    this.slimePatches = [];
+    this.pendingPowerup = null;
+    this.trajectoryShots = 0;
+    this.generatedCheckpointUsed = false;
+    this.stickyAnchor = null;
     this.shotSinceReset = false;
     this.accumulator = 0;
     this.groundHandles = new Set();
@@ -159,6 +199,7 @@ export class GameScene extends Phaser.Scene {
     this.dying = false;
     this.curDamping = BALL_LINEAR_DAMPING;
     this.curRestitution = BALL_RESTITUTION;
+    this.cleanupGameEvents = [];
   }
 
   // --- unit helpers -------------------------------------------------------
@@ -168,6 +209,32 @@ export class GameScene extends Phaser.Scene {
   }
   private cellCenter(col: number, row: number): { x: number; y: number } {
     return { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
+  }
+
+  private gidAt(col: number, row: number): number {
+    if (col < 0 || row < 0 || col >= this.map.cols || row >= this.map.rows) {
+      return 0;
+    }
+    return this.map.gids[row * this.map.cols + col] ?? 0;
+  }
+
+  private isSolidLikeGid(gid: number): boolean {
+    const id = cleanGid(gid) - 1;
+    if (gid <= 0 || isFlagId(id)) return false;
+    const role = roleOfGid(gid);
+    return (
+      role === 'ground' ||
+      role === 'ice' ||
+      role === 'ramp-up' ||
+      role === 'ramp-down' ||
+      role === 'finish' ||
+      role === 'checkpoint'
+    );
+  }
+
+  private onGameEvent(event: string, fn: (...args: unknown[]) => void) {
+    this.game.events.on(event, fn);
+    this.cleanupGameEvents.push(() => this.game.events.off(event, fn));
   }
 
   create() {
@@ -194,11 +261,14 @@ export class GameScene extends Phaser.Scene {
     this.renderTiles();
     this.buildColliders();
     this.createBall();
+    this.createCoins();
 
     this.aimGfx = this.add.graphics().setDepth(50);
+    this.trajectoryGfx = this.add.graphics().setDepth(49);
     this.setupInput();
     this.setupZoom();
     this.setupMenuBridge();
+    this.setupPowerupBridge();
     sound.init();
 
     this.input.setDefaultCursor(GameScene.CURSOR.default);
@@ -236,21 +306,103 @@ export class GameScene extends Phaser.Scene {
         this.pinchPrevDist = 0;
       }
     });
-    this.game.events.on('zoom-in', () => this.stepZoom(-1));
-    this.game.events.on('zoom-out', () => this.stepZoom(1));
-    this.game.events.on('zoom-set', (z: number) => this.applyZoom(z));
+    this.onGameEvent('zoom-in', () => this.stepZoom(-1));
+    this.onGameEvent('zoom-out', () => this.stepZoom(1));
+    this.onGameEvent('zoom-set', (z) => this.applyZoom(Number(z)));
   }
 
   /** Menu actions forwarded from the DOM shell. */
   private setupMenuBridge() {
-    this.game.events.on('return-checkpoint', () => {
+    this.onGameEvent('return-checkpoint', () => {
       if (this.finished) return;
       this.resetToRespawn();
       sound.play('Back', 0.5);
     });
-    this.game.events.on('recenter', () => {
+    this.onGameEvent('recenter', () => {
       this.cameras.main.startFollow(this.ball, false, 0.12, 0.12);
     });
+  }
+
+  /** Powerup actions forwarded from the DOM shell. */
+  private setupPowerupBridge() {
+    this.onGameEvent('powerup-request', (kind) => {
+      if (kind === 'trajectory' || kind === 'sticky' || kind === 'checkpoint') {
+        this.requestPowerup(kind);
+      }
+    });
+    this.onGameEvent('powerup-cancel', () => this.disarmPowerup());
+  }
+
+  private requestPowerup(kind: PowerupKind) {
+    if (this.finished || this.dying) {
+      this.game.events.emit('powerup-failed', 'Finish this run first.');
+      return;
+    }
+
+    if (kind === 'trajectory') {
+      if (this.trajectoryShots > 0) {
+        this.game.events.emit('powerup-failed', 'Trajectory is already ready.');
+        return;
+      }
+      if (!this.ballResting()) {
+        this.game.events.emit('powerup-failed', 'Wait until the ball stops.');
+        return;
+      }
+      this.trajectoryShots = Math.max(this.trajectoryShots, 1);
+      this.pendingPowerup = null;
+      this.game.events.emit('powerup-consumed', kind);
+      this.game.events.emit('powerup-disarmed');
+      this.game.events.emit('powerup-ready', 'Trajectory ready for your next shot.');
+      return;
+    }
+
+    if (kind === 'checkpoint') {
+      if (this.infuriating) {
+        this.game.events.emit('powerup-failed', 'Checkpoints are disabled in Infuriating Mode.');
+        return;
+      }
+      if (this.generatedCheckpointUsed) {
+        this.game.events.emit('powerup-failed', 'Only one generated checkpoint per run.');
+        return;
+      }
+      if (!this.ballResting() || !this.isGrounded()) {
+        this.game.events.emit('powerup-failed', 'Land on ground before making a checkpoint.');
+        return;
+      }
+      this.generatedCheckpointUsed = true;
+      this.respawn.set(this.ball.x, this.ball.y);
+      this.playGeneratedCheckpoint(this.ball.x, this.ball.y);
+      this.playCheckpointGlow(this.ball.x, this.ball.y);
+      this.bestCheckpointRank += 0.5;
+      this.activatedCheckpointRanks.add(this.bestCheckpointRank);
+      sound.play('Chime', 0.55);
+      this.game.events.emit('checkpoint-reached');
+      this.game.events.emit('powerup-consumed', kind);
+      this.game.events.emit('powerup-disarmed');
+      return;
+    }
+
+    if (!this.ballResting()) {
+      this.game.events.emit('powerup-failed', 'Wait until the ball stops.');
+      return;
+    }
+    this.pendingPowerup = this.pendingPowerup === 'sticky' ? null : 'sticky';
+    this.trajectoryGfx.clear();
+    if (this.pendingPowerup) {
+      this.setCursor('shoot');
+      this.game.events.emit('powerup-armed', this.pendingPowerup);
+      this.game.events.emit('powerup-ready', 'Click a wall to place slime.');
+    } else {
+      this.setCursor('default');
+      this.game.events.emit('powerup-disarmed');
+    }
+  }
+
+  private disarmPowerup() {
+    if (!this.pendingPowerup) return;
+    this.pendingPowerup = null;
+    this.setCursor('default');
+    this.game.events.emit('powerup-disarmed');
   }
 
   /** dir = +1 zooms out (smaller value), -1 zooms in (larger value). */
@@ -572,6 +724,137 @@ export class GameScene extends Phaser.Scene {
     this.groundHandles.add(collider.handle);
   }
 
+  // --- coins --------------------------------------------------------------
+
+  private createCoins() {
+    this.ensureCoinTexture();
+    const spots = this.pickCoinSpots();
+    for (const spot of spots) {
+      const id = `coin-${spot.col}-${spot.row}`;
+      if (this.collectedCoinIds.has(id)) continue;
+      const { x, y } = this.cellCenter(spot.col, spot.row);
+      const sprite = this.add.image(x, y, 'coin').setDepth(35);
+      sprite.setScale(0.95);
+      this.tweens.add({
+        targets: sprite,
+        y: y - 5,
+        duration: 760 + (this.hashCell(spot.col, spot.row) % 260),
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      this.coins.push({ id, sprite, x, y });
+    }
+  }
+
+  private ensureCoinTexture() {
+    if (this.textures.exists('coin')) return;
+    const size = 24;
+    const c = size / 2;
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(c + 2, c + 3, 18, 10);
+    g.fillStyle(0x8a4b0f, 1);
+    g.fillCircle(c, c, 10);
+    g.fillStyle(0xffd65a, 1);
+    g.fillCircle(c, c, 8);
+    g.fillStyle(0xfff1a6, 0.95);
+    g.fillCircle(c - 3, c - 4, 3);
+    g.lineStyle(2, 0x6b3a09, 1);
+    g.strokeCircle(c, c, 9);
+    g.generateTexture('coin', size, size);
+    g.destroy();
+  }
+
+  private pickCoinSpots(): Array<{ col: number; row: number }> {
+    const candidates: Array<{ col: number; row: number; hash: number }> = [];
+    for (let row = 0; row < this.map.rows - 1; row++) {
+      for (let col = 0; col < this.map.cols; col++) {
+        if (!this.isStandableCoinCell(col, row)) continue;
+        if (this.cellDistanceSq(col, row, this.map.spawn.col, this.map.spawn.row) < 18) {
+          continue;
+        }
+        if (this.cellDistanceSq(col, row, this.map.finish.col, this.map.finish.row) < 12) {
+          continue;
+        }
+        candidates.push({ col, row, hash: this.hashCell(col, row) });
+      }
+    }
+
+    candidates.sort((a, b) => a.hash - b.hash);
+    const picked: Array<{ col: number; row: number }> = [];
+    for (const c of candidates) {
+      if (picked.some((p) => this.cellDistanceSq(c.col, c.row, p.col, p.row) < 36)) {
+        continue;
+      }
+      picked.push({ col: c.col, row: c.row });
+      if (picked.length >= 5) break;
+    }
+    return picked;
+  }
+
+  private isStandableCoinCell(col: number, row: number): boolean {
+    if (this.gidAt(col, row) !== 0) return false;
+    const belowRole = roleOfGid(this.gidAt(col, row + 1));
+    return (
+      belowRole === 'ground' ||
+      belowRole === 'ice' ||
+      belowRole === 'ramp-up' ||
+      belowRole === 'ramp-down' ||
+      belowRole === 'checkpoint'
+    );
+  }
+
+  private cellDistanceSq(
+    aCol: number,
+    aRow: number,
+    bCol: number,
+    bRow: number
+  ): number {
+    const dx = aCol - bCol;
+    const dy = aRow - bRow;
+    return dx * dx + dy * dy;
+  }
+
+  private hashCell(col: number, row: number): number {
+    const key = `${this.dateKey}:${this.mapId}:${col}:${row}`;
+    let h = 2166136261;
+    for (let i = 0; i < key.length; i++) {
+      h ^= key.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  private collectCoin(coin: CoinPickup) {
+    this.coins = this.coins.filter((c) => c !== coin);
+    this.tweens.killTweensOf(coin.sprite);
+    this.onCoinCollected?.(coin.id);
+    sound.play('Chime', 0.3);
+    for (let i = 0; i < 8; i++) {
+      const p = this.add.circle(coin.x, coin.y, 2, i % 2 ? 0xfff1a6 : 0xffd65a);
+      p.setDepth(42);
+      const ang = (Math.PI * 2 * i) / 8;
+      this.tweens.add({
+        targets: p,
+        x: coin.x + Math.cos(ang) * 22,
+        y: coin.y + Math.sin(ang) * 22,
+        alpha: 0,
+        duration: 320,
+        ease: 'Quad.easeOut',
+        onComplete: () => p.destroy(),
+      });
+    }
+    this.tweens.add({
+      targets: coin.sprite,
+      scale: 1.45,
+      alpha: 0,
+      duration: 180,
+      ease: 'Back.easeIn',
+      onComplete: () => coin.sprite.destroy(),
+    });
+  }
+
   private createBall() {
     if (!this.textures.exists('ball')) {
       const g = this.make.graphics({ x: 0, y: 0 }, false);
@@ -603,6 +886,17 @@ export class GameScene extends Phaser.Scene {
 
     this.ensureBallTexture();
     this.ball = this.add.image(this.respawn.x, this.respawn.y, 'hgball').setDepth(40);
+    this.strokeLabel = this.add
+      .text(this.ball.x, this.ball.y - BALL_VISUAL_RADIUS - 10, '0', {
+        fontFamily: '"Comic Neue", "Comic Sans MS", system-ui, sans-serif',
+        fontSize: '28px',
+        fontStyle: '700',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 7,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(65);
   }
 
   /**
@@ -684,6 +978,7 @@ export class GameScene extends Phaser.Scene {
     return Math.hypot(v.x, v.y);
   }
   private ballResting(): boolean {
+    if (this.stickyAnchor) return true;
     return this.ballSpeed() < REST_SPEED;
   }
 
@@ -734,6 +1029,10 @@ export class GameScene extends Phaser.Scene {
   private setupInput() {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       sound.startAmbient();
+      if (this.pendingPowerup === 'sticky') {
+        this.placeStickySlimeFromPointer(p);
+        return;
+      }
       if (this.finished || !this.ballResting()) return;
       // Aim only when the press starts on/near the ball, like the original.
       if (this.nearBall(p)) {
@@ -758,6 +1057,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.aiming) return;
       this.aiming = false;
       this.aimGfx.clear();
+      this.trajectoryGfx.clear();
       this.shoot(p);
       // Back to grab if still hovering the (now moving) ball, else default.
       this.setCursor(this.nearBall(p) ? 'grab' : 'default');
@@ -836,7 +1136,147 @@ export class GameScene extends Phaser.Scene {
     this.aimGfx.fillStyle(col, 0.9);
     this.aimGfx.fillCircle(px, py, dot);
 
+    if (this.trajectoryShots > 0) this.drawTrajectoryPreview(v);
+    else this.trajectoryGfx.clear();
+
     this.applyChargeZoom(raw);
+  }
+
+  private drawTrajectoryPreview(v: Phaser.Math.Vector2) {
+    this.trajectoryGfx.clear();
+    const raw = Math.min(1, v.length() / MAX_DRAG);
+    if (raw < 0.04) return;
+
+    const snapped = 0.005 * Math.round(raw / 0.005);
+    const power = Math.pow(snapped, POWER_EXP);
+    const dir = v.clone().normalize();
+    const vx = dir.x * power * MAX_LAUNCH_SPEED;
+    const vy = dir.y * power * MAX_LAUNCH_SPEED;
+
+    this.trajectoryGfx.fillStyle(0x9ffcff, 0.82);
+    const dt = 0.08;
+    for (let i = 1; i <= 42; i++) {
+      const t = i * dt;
+      const x = this.ball.x + vx * PIXELS_PER_METER * t;
+      const y =
+        this.ball.y +
+        vy * PIXELS_PER_METER * t +
+        0.5 * GRAVITY_Y * PIXELS_PER_METER * t * t;
+
+      if (
+        x < -TILE ||
+        y < -TILE ||
+        x > this.worldW + TILE ||
+        y > this.worldH + TILE ||
+        this.isSolidLikeGid(this.gidAt(Math.floor(x / TILE), Math.floor(y / TILE)))
+      ) {
+        break;
+      }
+      const radius = Math.max(2, 5 - i * 0.06) / (this.cameras.main.zoom || 1);
+      this.trajectoryGfx.fillCircle(x, y, radius);
+    }
+  }
+
+  private placeStickySlimeFromPointer(p: Phaser.Input.Pointer) {
+    if (this.finished || this.dying) return;
+    const world = this.cameras.main.getWorldPoint(p.x, p.y);
+    if (
+      world.x < 0 ||
+      world.y < 0 ||
+      world.x > this.worldW ||
+      world.y > this.worldH ||
+      !this.nearSolidSurface(world.x, world.y)
+    ) {
+      this.game.events.emit('powerup-failed', 'Click on a wall or platform for slime.');
+      return;
+    }
+
+    this.placeSlimePatch(world.x, world.y);
+    this.pendingPowerup = null;
+    this.setCursor('default');
+    this.game.events.emit('powerup-consumed', 'sticky');
+    this.game.events.emit('powerup-disarmed');
+  }
+
+  private nearSolidSurface(x: number, y: number): boolean {
+    const col = Math.floor(x / TILE);
+    const row = Math.floor(y / TILE);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (this.isSolidLikeGid(this.gidAt(col + dx, row + dy))) return true;
+      }
+    }
+    return false;
+  }
+
+  private placeSlimePatch(x: number, y: number) {
+    const radius = TILE * 0.72;
+    const gfx = this.add.graphics().setDepth(34);
+    gfx.fillStyle(0x123b1c, 0.42);
+    gfx.fillCircle(x + 3, y + 5, radius * 0.9);
+    gfx.fillStyle(0x43d86a, 0.9);
+    gfx.fillCircle(x, y, radius * 0.72);
+    gfx.fillStyle(0x8fff95, 0.75);
+    gfx.fillCircle(x - 7, y - 7, radius * 0.28);
+    gfx.fillStyle(0x1f8f3b, 0.85);
+    gfx.fillCircle(x + 10, y + 8, radius * 0.3);
+    this.slimePatches.push({
+      circle: new Phaser.Geom.Circle(x, y, radius),
+      gfx,
+    });
+    this.cameras.main.flash(90, 97, 255, 135);
+    sound.play('Leaves', 0.45);
+  }
+
+  private stickToSlime(patch: SlimePatch) {
+    if (this.stickyAnchor || this.finished || this.dying) return;
+    this.stickyAnchor = new Phaser.Math.Vector2(this.ball.x, this.ball.y);
+    this.ballBody.setLinvel({ x: 0, y: 0 }, true);
+    this.ballBody.setAngvel(0, true);
+    this.ball.setTint(0x8fff95);
+    this.tweens.add({
+      targets: this.ball,
+      scaleX: 1.2,
+      scaleY: 0.82,
+      duration: 110,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.ball.clearTint();
+        this.ball.setScale(1, 1);
+      },
+    });
+    patch.gfx.setAlpha(0.82);
+    sound.play('Leaves', 0.5);
+  }
+
+  private playGeneratedCheckpoint(x: number, y: number) {
+    this.ensureGeneratedCheckpointTexture();
+    const flag = this.add
+      .image(x, y - TILE * 0.85, 'generated-checkpoint')
+      .setDepth(36);
+    this.checkpointFlagMarkers.push({
+      sprite: flag,
+      rank: this.bestCheckpointRank + 0.5,
+    });
+  }
+
+  private ensureGeneratedCheckpointTexture() {
+    if (this.textures.exists('generated-checkpoint')) return;
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    g.lineStyle(3, 0x3b2a14, 1);
+    g.beginPath();
+    g.moveTo(10, 42);
+    g.lineTo(10, 8);
+    g.strokePath();
+    g.fillStyle(0xfff1a6, 1);
+    g.fillTriangle(12, 9, 30, 15, 12, 23);
+    g.lineStyle(2, 0x7c4a03, 1);
+    g.strokeTriangle(12, 9, 30, 15, 12, 23);
+    g.fillStyle(0x047857, 1);
+    g.fillEllipse(10, 43, 18, 7);
+    g.generateTexture('generated-checkpoint', 36, 48);
+    g.destroy();
   }
 
   /**
@@ -865,8 +1305,10 @@ export class GameScene extends Phaser.Scene {
       this.restoreZoom();
       return;
     }
+    this.stickyAnchor = null;
     this.strokes += 1;
     this.onStroke?.(this.strokes);
+    this.strokeLabel.setText(String(this.strokes));
     // Original: snap power to 0.005 steps, velocity = dir * pow(power,1.2)*150.
     const raw = Math.min(1, v.length() / MAX_DRAG);
     const snapped = 0.005 * Math.round(raw / 0.005);
@@ -892,10 +1334,14 @@ export class GameScene extends Phaser.Scene {
     // Stretch along the launch direction for that satisfying "lunge".
     this.triggerSquash(Math.atan2(dir.y, dir.x), Math.max(0.35, raw));
     sound.play('BallHit', 0.3 * raw);
+    if (this.trajectoryShots > 0) this.trajectoryShots -= 1;
+    this.game.events.emit('powerup-disarmed');
     this.restoreZoom();
   }
 
   private resetToRespawn() {
+    this.stickyAnchor = null;
+    this.trajectoryGfx.clear();
     this.ballBody.setLinvel({ x: 0, y: 0 }, true);
     this.ballBody.setAngvel(0, true);
     this.ballBody.setTranslation(
@@ -924,6 +1370,15 @@ export class GameScene extends Phaser.Scene {
       steps++;
     }
 
+    if (this.stickyAnchor) {
+      this.ballBody.setLinvel({ x: 0, y: 0 }, true);
+      this.ballBody.setAngvel(0, true);
+      this.ballBody.setTranslation(
+        { x: this.pxToM(this.stickyAnchor.x), y: this.pxToM(this.stickyAnchor.y) },
+        true
+      );
+    }
+
     // While drowning, the death tween owns the ball's position/scale/alpha, so
     // don't overwrite it from physics.
     if (!this.dying) {
@@ -934,6 +1389,8 @@ export class GameScene extends Phaser.Scene {
       // Squash/stretch pulse (delta in ~60fps ticks, like the bundle).
       this.updateSquash(delta / (1000 / 60));
     }
+    this.strokeLabel?.setPosition(this.ball.x, this.ball.y - BALL_VISUAL_RADIUS - 10);
+    this.strokeLabel?.setText(String(this.strokes));
 
     if (this.finished || this.dying) return;
 
@@ -1002,6 +1459,22 @@ export class GameScene extends Phaser.Scene {
       sound.play('Leaves', 0.4);
     }
     this.inRough = overRough;
+
+    for (const coin of [...this.coins]) {
+      if (Phaser.Math.Distance.Between(bx, by, coin.x, coin.y) <= BALL_RADIUS + 13) {
+        this.collectCoin(coin);
+      }
+    }
+
+    if (!this.stickyAnchor) {
+      const stickyCircle = new Phaser.Geom.Circle(bx, by, BALL_RADIUS * 1.05);
+      for (const patch of this.slimePatches) {
+        if (Phaser.Geom.Intersects.CircleToCircle(stickyCircle, patch.circle)) {
+          this.stickToSlime(patch);
+          break;
+        }
+      }
+    }
 
     this.checkCheckpointGround();
   }
@@ -1207,6 +1680,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   shutdown() {
+    for (const cleanup of this.cleanupGameEvents) cleanup();
+    this.cleanupGameEvents = [];
     this.eventQueue?.free();
     this.world?.free();
   }

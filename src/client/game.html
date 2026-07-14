@@ -185,6 +185,122 @@
         background: rgba(0, 0, 0, 0.75);
       }
 
+      /* Powerups ----------------------------------------------------------*/
+      #powerup-bar {
+        position: fixed;
+        left: 50%;
+        bottom: 14px;
+        transform: translateX(-50%);
+        z-index: 12;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: calc(100vw - 148px);
+        padding: 6px;
+        border-radius: 16px;
+        background: rgba(0, 0, 0, 0.48);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      #coin-wallet {
+        min-width: 58px;
+        height: 42px;
+        padding: 0 10px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        font-weight: 800;
+        color: #4a2c17;
+        background: #ffd65a;
+        border: 2px solid #8a4b0f;
+        box-shadow: inset 0 2px rgba(255, 255, 255, 0.45);
+      }
+      .coin-icon {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #fff1a6 0 20%, #ffd65a 22% 65%, #8a4b0f 67%);
+        box-shadow: 0 0 0 1px #6b3a09;
+      }
+      .powerup-btn {
+        position: relative;
+        width: 46px;
+        height: 46px;
+        border: 2px solid rgba(255, 255, 255, 0.18);
+        border-radius: 14px;
+        color: #fff;
+        background: rgba(20, 20, 20, 0.7);
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+      }
+      .powerup-btn.active {
+        border-color: #8fff95;
+        box-shadow: 0 0 0 3px rgba(143, 255, 149, 0.22), 0 3px 0 rgba(0, 0, 0, 0.35);
+      }
+      .powerup-btn.can-buy {
+        border-color: #ffd65a;
+      }
+      .powerup-btn.empty:not(.can-buy) {
+        opacity: 0.62;
+      }
+      .powerup-icon {
+        font-size: 22px;
+        line-height: 1;
+        text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+      }
+      .powerup-btn[data-powerup="trajectory"] .powerup-icon {
+        color: #9ffcff;
+      }
+      .powerup-btn[data-powerup="sticky"] .powerup-icon {
+        color: #8fff95;
+      }
+      .powerup-btn[data-powerup="checkpoint"] .powerup-icon {
+        color: #fff1a6;
+      }
+      .powerup-count,
+      .powerup-price {
+        position: absolute;
+        font-size: 10px;
+        line-height: 1;
+        border-radius: 999px;
+        padding: 3px 5px;
+      }
+      .powerup-count {
+        top: -6px;
+        right: -6px;
+        background: #047857;
+        border: 1px solid #8fff95;
+      }
+      .powerup-price {
+        left: -6px;
+        bottom: -6px;
+        color: #4a2c17;
+        background: #ffd65a;
+        border: 1px solid #8a4b0f;
+      }
+      @media (max-width: 560px) {
+        #powerup-bar {
+          bottom: 12px;
+          max-width: calc(100vw - 116px);
+          gap: 5px;
+        }
+        #coin-wallet {
+          min-width: 48px;
+          height: 38px;
+          padding: 0 8px;
+        }
+        .powerup-btn {
+          width: 40px;
+          height: 40px;
+        }
+        .powerup-icon {
+          font-size: 19px;
+        }
+      }
+
       /* Checkpoint banner + return button ----------------------------------*/
       #checkpoint-alert {
         position: fixed;
@@ -509,6 +625,28 @@
       <button id="btn-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
       <button id="btn-zoom-out" title="Zoom out" aria-label="Zoom out">&minus;</button>
       <button id="btn-mute" title="Toggle sound" aria-label="Toggle sound">&#128266;</button>
+    </div>
+
+    <div id="powerup-bar" aria-label="Powerups">
+      <div id="coin-wallet" title="Coins">
+        <span class="coin-icon"></span>
+        <span id="wallet-coins">0</span>
+      </div>
+      <button class="powerup-btn" data-powerup="trajectory" title="Trajectory" aria-label="Trajectory powerup">
+        <span class="powerup-icon">&#10022;</span>
+        <span class="powerup-count" id="powerup-trajectory-count">0</span>
+        <span class="powerup-price" id="powerup-trajectory-price">3</span>
+      </button>
+      <button class="powerup-btn" data-powerup="sticky" title="Sticky slime" aria-label="Sticky slime powerup">
+        <span class="powerup-icon">&#9679;</span>
+        <span class="powerup-count" id="powerup-sticky-count">0</span>
+        <span class="powerup-price" id="powerup-sticky-price">6</span>
+      </button>
+      <button class="powerup-btn" data-powerup="checkpoint" title="Checkpoint generator" aria-label="Checkpoint generator powerup">
+        <span class="powerup-icon">&#9873;</span>
+        <span class="powerup-count" id="powerup-checkpoint-count">0</span>
+        <span class="powerup-price" id="powerup-checkpoint-price">10</span>
+      </button>
     </div>
 
     <!-- Checkpoint feedback -->
