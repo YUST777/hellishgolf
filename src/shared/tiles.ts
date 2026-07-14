@@ -108,6 +108,11 @@ export function isSolidId(id: number): boolean {
   return solidSet.has(id);
 }
 
+/** True if the tileId is a checkpoint-ground tile (the checkpoint platform). */
+export function isCheckpointGroundId(id: number): boolean {
+  return checkpointGroundSet.has(id);
+}
+
 /**
  * Tiled stores horizontal/vertical/diagonal flip flags in the top 3 bits of a
  * gid. Mask them off to recover the real gid.

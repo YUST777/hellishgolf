@@ -25,7 +25,13 @@ import {
   ZOOM_LEVELS,
 } from './config';
 import type { RuntimeMap } from '../../shared/tiled';
-import { roleOfGid, rampShapeOfId, cleanGid, TILESET } from '../../shared/tiles';
+import {
+  roleOfGid,
+  rampShapeOfId,
+  cleanGid,
+  isCheckpointGroundId,
+  TILESET,
+} from '../../shared/tiles';
 import { sound } from './sound';
 import { RAPIER } from './physics';
 
@@ -66,11 +72,8 @@ export class GameScene extends Phaser.Scene {
   /** Sensor rects kept in world pixels for cheap per-frame overlap tests. */
   private waterRects: Phaser.Geom.Rectangle[] = [];
   private roughRects: Phaser.Geom.Rectangle[] = [];
-  private checkpointCells: { rect: Phaser.Geom.Rectangle; col: number; row: number }[] =
-    [];
-  /** Keys of activated checkpoints, and the flag sprite for each cell. */
-  private activatedCps = new Set<string>();
-  private cpFlags = new Map<string, Phaser.GameObjects.Image>();
+  /** The checkpoint-ground tile the ball last landed on (chime once per). */
+  private lastCheckpointKey = '';
   private finishZone!: Phaser.Geom.Rectangle;
 
   private lastBounceAt = 0;
@@ -119,9 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.finished = false;
     this.waterRects = [];
     this.roughRects = [];
-    this.checkpointCells = [];
-    this.activatedCps = new Set();
-    this.cpFlags = new Map();
+    this.lastCheckpointKey = '';
     this.accumulator = 0;
     this.groundHandles = new Set();
     this.squashElapsed = 15;
@@ -412,11 +413,8 @@ export class GameScene extends Phaser.Scene {
         const rect = new Phaser.Geom.Rectangle(x - TILE / 2, y - TILE / 2, TILE, TILE);
         if (role === 'water') this.waterRects.push(rect);
         else if (role === 'rough') this.roughRects.push(rect);
-        else if (cleanGid(gid) - 1 === 153) {
-          // The flag doubles as a checkpoint: touching it saves the respawn
-          // point so a later death returns the ball here (not the tee).
-          this.checkpointCells.push({ rect, col, row });
-        }
+        // Checkpoints are detected from the checkpoint-ground tiles the ball
+        // rests on (see checkCheckpointGround), not from the flag.
       }
     }
 
@@ -899,17 +897,38 @@ export class GameScene extends Phaser.Scene {
     }
     this.inRough = overRough;
 
-    // Kinda Infuriating Mode disables checkpoints entirely. Otherwise the flag
-    // activates generously (within ~2 tiles) so landing anywhere on its
-    // platform — or rolling past it — saves the respawn point.
-    if (!this.infuriating) {
-      for (const cp of this.checkpointCells) {
-        const c = this.cellCenter(cp.col, cp.row);
-        if (Phaser.Math.Distance.Between(bx, by, c.x, c.y) <= TILE * 2) {
-          this.hitCheckpoint(cp.col, cp.row);
-        }
-      }
+    this.checkCheckpointGround();
+  }
+
+  /**
+   * Checkpoints are the checkpoint-ground tile groups (not the flag). When the
+   * ball comes to rest on top of any checkpoint-ground tile, we save its exact
+   * resting position as the respawn, so a later death returns it right there.
+   * The chime plays once per platform (keyed by the tile column run).
+   */
+  private checkCheckpointGround() {
+    if (this.infuriating) return;
+    if (this.ballSpeed() > REST_SPEED) return; // only when settled
+
+    const { cols, rows, gids } = this.map;
+    const col = Math.floor(this.ball.x / TILE);
+    // The tile the ball is standing on is just below its feet.
+    const footRow = Math.floor((this.ball.y + BALL_RADIUS) / TILE);
+    if (col < 0 || col >= cols || footRow < 0 || footRow >= rows) return;
+
+    const id = cleanGid(gids[footRow * cols + col] ?? 0) - 1;
+    if (!isCheckpointGroundId(id)) return;
+
+    const key = `${col},${footRow}`;
+    if (key !== this.lastCheckpointKey) {
+      this.lastCheckpointKey = key;
+      sound.play('Chime', 0.2);
+      this.onCheckpoint?.();
+      this.game.events.emit('checkpoint-reached');
+      this.cameras.main.flash(120, 253, 223, 106);
     }
+    // Save the ball's current resting spot as the respawn point.
+    this.respawn.set(this.ball.x, this.ball.y);
   }
 
   /**
@@ -992,63 +1011,6 @@ export class GameScene extends Phaser.Scene {
         ease: 'Quad.easeOut',
         onComplete: () => p.destroy(),
       });
-    }
-  }
-
-  /**
-   * Activate a checkpoint on contact (mirrors the bundle): add it to the
-   * activated set, play the Chime, light up its flag, and move the respawn to
-   * the FURTHEST-progressed activated checkpoint (closest to the finish) so
-   * dropping back onto an earlier checkpoint never loses progress.
-   */
-  private hitCheckpoint(col: number, row: number) {
-    const key = `${col},${row}`;
-    if (this.activatedCps.has(key)) return;
-    this.activatedCps.add(key);
-
-    // Light the flag to show it's active.
-    const flag = this.cpFlags.get(key);
-    if (flag) {
-      flag.clearTint();
-      this.tweens.add({
-        targets: flag,
-        scaleX: flag.scaleX * 1.25,
-        scaleY: flag.scaleY * 1.25,
-        duration: 130,
-        yoyo: true,
-        ease: 'Quad.easeOut',
-      });
-    }
-
-    this.updateRespawnFromCheckpoints();
-    this.onCheckpoint?.();
-    this.game.events.emit('checkpoint-reached');
-    sound.play('Chime', 0.2);
-    this.cameras.main.flash(140, 253, 223, 106);
-  }
-
-  /** Set respawn to the activated checkpoint nearest the finish (furthest
-   *  progressed), or the tee if none are active. */
-  private updateRespawnFromCheckpoints() {
-    const f = this.cellCenter(this.map.finish.col, this.map.finish.row);
-    let best: { col: number; row: number } | null = null;
-    let bestDist = Infinity;
-    for (const cp of this.checkpointCells) {
-      if (!this.activatedCps.has(`${cp.col},${cp.row}`)) continue;
-      const c = this.cellCenter(cp.col, cp.row);
-      const d = Phaser.Math.Distance.Squared(c.x, c.y, f.x, f.y);
-      if (d < bestDist) {
-        bestDist = d;
-        best = cp;
-      }
-    }
-    if (best) {
-      // Respawn right where the flag sits (the ball rests on the platform
-      // just below it), so death returns you to the checkpoint.
-      const c = this.cellCenter(best.col, best.row);
-      this.respawn.set(c.x, c.y);
-    } else {
-      this.respawn.copy(this.startPos);
     }
   }
 
