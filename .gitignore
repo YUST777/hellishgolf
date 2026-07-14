@@ -4,6 +4,7 @@ dist/
 .devvit/
 .env
 .env.*
+!.env.example
 
 # Local Codex/agent workspace material, not part of the app runtime.
 .agents/

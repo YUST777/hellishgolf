@@ -25,6 +25,48 @@
       "asUser": ["SUBMIT_POST", "SUBMIT_COMMENT"]
     }
   },
+  "settings": {
+    "global": {
+      "DATABASE_URL": {
+        "type": "string",
+        "label": "Supabase DATABASE_URL",
+        "helpText": "Server-only pooled Supabase Postgres connection string.",
+        "isSecret": true
+      },
+      "DB_HOST": {
+        "type": "string",
+        "label": "Supabase DB host",
+        "helpText": "Use only if DATABASE_URL is not set."
+      },
+      "DB_PORT": {
+        "type": "string",
+        "label": "Supabase DB port",
+        "helpText": "Use 6543 for the Supabase transaction pooler."
+      },
+      "DB_NAME": {
+        "type": "string",
+        "label": "Supabase DB name",
+        "helpText": "Usually postgres."
+      },
+      "DB_USER": {
+        "type": "string",
+        "label": "Supabase DB user",
+        "helpText": "Use only if DATABASE_URL is not set.",
+        "isSecret": true
+      },
+      "DB_PASSWORD": {
+        "type": "string",
+        "label": "Supabase DB password",
+        "helpText": "Use only if DATABASE_URL is not set.",
+        "isSecret": true
+      },
+      "DB_SSL": {
+        "type": "string",
+        "label": "Database SSL mode",
+        "helpText": "Leave empty for Supabase; set disable only for trusted local Postgres."
+      }
+    }
+  },
   "menu": {
     "items": [
       {

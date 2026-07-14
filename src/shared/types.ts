@@ -66,8 +66,10 @@ export interface InitResponse {
 
 export interface SubmitScoreRequest {
   strokes: number;
-  /** Seconds taken, for tie-breaking / stats. */
+  /** Milliseconds taken, for tie-breaking / stats. */
   timeMs: number;
+  /** Shot-level replay data captured by the client. */
+  moves?: ReplayMove[];
 }
 
 export interface SubmitScoreResponse {
@@ -89,6 +91,25 @@ export interface LeaderboardResponse {
   entries: LeaderboardEntry[];
   totalPlayers: number;
   you: LeaderboardEntry | null;
+}
+
+/** A single shot in a completed run, enough to replay the ball launches. */
+export interface ReplayMove {
+  /** 1-based shot number. */
+  shot: number;
+  /** Milliseconds since the hole started. */
+  t: number;
+  /** Ball position in world pixels at launch. */
+  x: number;
+  y: number;
+  /** Drag vector in world pixels used to aim the shot. */
+  dragX: number;
+  dragY: number;
+  /** Normalized launch power after snapping and exponent scaling. */
+  power: number;
+  /** Rapier launch velocity in metres per second. */
+  velocityX: number;
+  velocityY: number;
 }
 
 /** Request to create a user-generated hole from a seed. */

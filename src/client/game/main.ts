@@ -15,7 +15,7 @@ import { sound } from './sound';
 import { mapUrl } from '../../shared/mapManifest';
 import { parseTiledMap, type RuntimeMap } from '../../shared/tiled';
 import { TILESET } from '../../shared/tiles';
-import type { InitResponse, LeaderboardResponse } from '../../shared/types';
+import type { InitResponse, LeaderboardResponse, ReplayMove } from '../../shared/types';
 
 /** Read the persisted discrete zoom preference (defaults to 1). */
 function readZoom(): number {
@@ -77,7 +77,8 @@ function sceneData() {
     onStroke: (n: number) => setHud(n, init?.bestToday ?? null, init?.streak ?? 0),
     // The checkpoint banner is driven by the 'checkpoint-reached' scene event.
     onCheckpoint: () => {},
-    onFinish: (strokes: number, timeMs: number) => onFinish(strokes, timeMs),
+    onFinish: (strokes: number, timeMs: number, moves: ReplayMove[]) =>
+      onFinish(strokes, timeMs, moves),
   };
 }
 
@@ -122,11 +123,11 @@ function startGame(data: InitResponse, map: RuntimeMap) {
   });
 }
 
-async function onFinish(strokes: number, timeMs: number) {
+async function onFinish(strokes: number, timeMs: number, moves: ReplayMove[]) {
   launchWinConfetti();
   showResult(strokes, timeMs, null, null);
   try {
-    const res = await apiClient.submitScore({ strokes, timeMs });
+    const res = await apiClient.submitScore({ strokes, timeMs, moves });
     if (init) {
       init.bestToday = res.bestToday;
       init.streak = res.streak;

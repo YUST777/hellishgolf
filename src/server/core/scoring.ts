@@ -2,8 +2,16 @@ import { redis } from '@devvit/web/server';
 import type {
   LeaderboardEntry,
   LeaderboardResponse,
+  ReplayMove,
   SubmitScoreResponse,
 } from '../../shared/types';
+import {
+  getSupabaseBest,
+  getSupabaseLeaderboard,
+  isSupabaseConfigured,
+  sanitizeReplayMoves,
+  submitSupabaseScore,
+} from './supabase';
 
 /**
  * Redis key design (siloed per subreddit install):
@@ -39,6 +47,14 @@ export async function getBest(
   postId: string,
   username: string
 ): Promise<number | null> {
+  if (await isSupabaseConfigured()) {
+    try {
+      return await getSupabaseBest(dateKey, postId, username);
+    } catch (error) {
+      console.error('Supabase getBest failed; falling back to Redis:', error);
+    }
+  }
+
   const score = await redis.zScore(lbKey(dateKey, postId), username);
   return typeof score === 'number' ? score : null;
 }
@@ -70,23 +86,47 @@ export async function submitScore(params: {
   dateKey: string;
   postId: string;
   username: string;
+  mapId: number;
   strokes: number;
   timeMs: number;
+  moves?: ReplayMove[];
 }): Promise<SubmitScoreResponse> {
   const { dateKey, postId, username, strokes, timeMs } = params;
+  const moves = sanitizeReplayMoves(params.moves);
+  const streak = await bumpStreak(username, dateKey);
+
+  if (await isSupabaseConfigured()) {
+    try {
+      return await submitSupabaseScore({
+        dateKey,
+        postId,
+        username,
+        mapId: params.mapId,
+        strokes,
+        timeMs,
+        streak,
+        moves,
+      });
+    } catch (error) {
+      console.error('Supabase submitScore failed; falling back to Redis:', error);
+    }
+  }
+
   const key = lbKey(dateKey, postId);
 
   const existing = await redis.zScore(key, username);
   const hadPrevious = typeof existing === 'number';
-  const improved = !hadPrevious || strokes < existing!;
+  const existingTimeRaw = hadPrevious
+    ? await redis.hGet(timeKey(dateKey, postId), username)
+    : null;
+  const existingTime = existingTimeRaw ? parseInt(existingTimeRaw, 10) : Infinity;
+  const improved =
+    !hadPrevious || strokes < existing! || (strokes === existing && timeMs < existingTime);
 
   if (improved) {
     await redis.zAdd(key, { member: username, score: strokes });
     await redis.hSet(timeKey(dateKey, postId), { [username]: String(timeMs) });
   }
-
-  // Streaks count on any completion of the day's hole.
-  const streak = await bumpStreak(username, dateKey);
 
   const bestToday = improved ? strokes : existing!;
   const rank = (await redis.zRank(key, username)) ?? 0;
@@ -110,6 +150,15 @@ export async function leaderboard(params: {
   limit?: number;
 }): Promise<LeaderboardResponse> {
   const { dateKey, postId, username, limit = 10 } = params;
+
+  if (await isSupabaseConfigured()) {
+    try {
+      return await getSupabaseLeaderboard({ dateKey, postId, username, limit });
+    } catch (error) {
+      console.error('Supabase leaderboard failed; falling back to Redis:', error);
+    }
+  }
+
   const key = lbKey(dateKey, postId);
 
   const totalPlayers = await redis.zCard(key);

@@ -67,16 +67,22 @@ api.post('/score', async (c) => {
     }
 
     const body = await c.req.json<SubmitScoreRequest>();
-    const strokes = Math.max(1, Math.min(999, Math.floor(body.strokes)));
-    const timeMs = Math.max(0, Math.floor(body.timeMs));
+    const rawStrokes = Number(body.strokes);
+    const rawTimeMs = Number(body.timeMs);
+    const strokes = Number.isFinite(rawStrokes)
+      ? Math.max(1, Math.min(999, Math.floor(rawStrokes)))
+      : 999;
+    const timeMs = Number.isFinite(rawTimeMs) ? Math.max(0, Math.floor(rawTimeMs)) : 0;
 
-    const { daily } = await getPostLevelInfo(postId);
+    const { daily, mapId } = await getPostLevelInfo(postId);
     const result = await submitScore({
       dateKey: daily.dateKey,
       postId,
       username,
+      mapId,
       strokes,
       timeMs,
+      moves: body.moves,
     });
 
     return c.json<SubmitScoreResponse>(result);

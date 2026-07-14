@@ -25,6 +25,7 @@ import {
   ZOOM_LEVELS,
 } from './config';
 import type { RuntimeMap } from '../../shared/tiled';
+import type { ReplayMove } from '../../shared/types';
 import {
   roleOfGid,
   rampShapeOfId,
@@ -81,6 +82,7 @@ export class GameScene extends Phaser.Scene {
   private strokes = 0;
   private startTime = 0;
   private finished = false;
+  private moves: ReplayMove[] = [];
 
   private respawn = new Phaser.Math.Vector2();
   /** The spawn/tee, used as the fallback respawn before any checkpoint. */
@@ -112,7 +114,7 @@ export class GameScene extends Phaser.Scene {
   private curRestitution = BALL_RESTITUTION;
 
   private onStroke?: (n: number) => void;
-  private onFinish?: (n: number, t: number) => void;
+  private onFinish?: (n: number, t: number, moves: ReplayMove[]) => void;
   private onCheckpoint?: () => void;
 
   /** Cursor CSS strings (image + hotspot) for each interaction state. */
@@ -131,7 +133,7 @@ export class GameScene extends Phaser.Scene {
     zoom?: number;
     infuriating?: boolean;
     onStroke?: (n: number) => void;
-    onFinish?: (n: number, t: number) => void;
+    onFinish?: (n: number, t: number, moves: ReplayMove[]) => void;
     onCheckpoint?: () => void;
   }) {
     this.map = data.map;
@@ -141,6 +143,7 @@ export class GameScene extends Phaser.Scene {
     this.onFinish = data.onFinish;
     this.onCheckpoint = data.onCheckpoint;
     this.strokes = 0;
+    this.moves = [];
     this.finished = false;
     this.waterRects = [];
     this.roughRects = [];
@@ -870,7 +873,20 @@ export class GameScene extends Phaser.Scene {
     const power = Math.pow(snapped, POWER_EXP);
     const dir = v.clone().normalize();
     const speed = power * MAX_LAUNCH_SPEED;
-    this.ballBody.setLinvel({ x: dir.x * speed, y: dir.y * speed }, true);
+    const velocityX = dir.x * speed;
+    const velocityY = dir.y * speed;
+    this.moves.push({
+      shot: this.strokes,
+      t: Math.max(0, Math.round(this.time.now - this.startTime)),
+      x: Math.round(this.ball.x * 1000) / 1000,
+      y: Math.round(this.ball.y * 1000) / 1000,
+      dragX: Math.round(v.x * 1000) / 1000,
+      dragY: Math.round(v.y * 1000) / 1000,
+      power: Math.round(power * 10000) / 10000,
+      velocityX: Math.round(velocityX * 1000) / 1000,
+      velocityY: Math.round(velocityY * 1000) / 1000,
+    });
+    this.ballBody.setLinvel({ x: velocityX, y: velocityY }, true);
     this.ballBody.setAngvel(0, true);
     this.shotSinceReset = true;
     // Stretch along the launch direction for that satisfying "lunge".
@@ -1187,7 +1203,7 @@ export class GameScene extends Phaser.Scene {
     this.ballBody.setLinvel({ x: 0, y: 0 }, true);
     this.cameras.main.flash(300, 253, 223, 106);
     sound.play('Claps', 0.6);
-    this.onFinish?.(this.strokes, timeMs);
+    this.onFinish?.(this.strokes, timeMs, [...this.moves]);
   }
 
   shutdown() {
