@@ -4,7 +4,8 @@ import type {
   SubmitScoreRequest,
   SubmitScoreResponse,
 } from '../../shared/types';
-import { MAP_IDS } from '../../shared/mapManifest';
+import { seedFromDateKey } from '../../shared/level';
+import { pickMapId } from '../../shared/mapManifest';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -38,8 +39,7 @@ function todayKeyUTC(): string {
 function dailyMapId(dateKey: string): { mapId: number; holeNumber: number } {
   const epoch = Date.UTC(2025, 0, 1);
   const day = Math.floor((Date.parse(dateKey) - epoch) / 86_400_000);
-  const idx = ((day % MAP_IDS.length) + MAP_IDS.length) % MAP_IDS.length;
-  return { mapId: MAP_IDS[idx]!, holeNumber: day + 1 };
+  return { mapId: pickMapId(seedFromDateKey(dateKey)), holeNumber: day + 1 };
 }
 
 function offlineBest(dateKey: string): number | null {

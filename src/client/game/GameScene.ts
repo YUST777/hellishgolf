@@ -12,7 +12,6 @@ import {
   BALL_VISUAL_RADIUS,
   COLORS,
   DEFAULT_ZOOM,
-  DIRT_FRAME,
   GRAVITY_Y,
   MAX_DRAG,
   MAX_LAUNCH_SPEED,
@@ -20,7 +19,6 @@ import {
   PIXELS_PER_METER,
   POWER_EXP,
   REST_SPEED,
-  SOURCE_TILE,
   TILE,
   ZOOM_LEVELS,
 } from './config';
@@ -282,12 +280,6 @@ export class GameScene extends Phaser.Scene {
       .rectangle(left, top, totalW, totalH, COLORS.dirt)
       .setOrigin(0, 0)
       .setDepth(-14);
-    if (this.ensureDirtTexture()) {
-      this.add
-        .tileSprite(left, top, totalW, totalH, 'dirt')
-        .setOrigin(0, 0)
-        .setDepth(-13);
-    }
 
     // INNER background = the checkerboard grid, filling ONLY the map rectangle
     // (the area the ball plays against), mirroring the original's grid backdrop.
@@ -299,32 +291,6 @@ export class GameScene extends Phaser.Scene {
       grid.tileScaleX = 12.5;
       grid.tileScaleY = 12.5;
     }
-  }
-
-  private ensureDirtTexture(): boolean {
-    if (this.textures.exists('dirt')) return true;
-    if (!this.textures.exists('tileset')) return false;
-    const tex = this.textures.get('tileset');
-    const frame = tex.get(DIRT_FRAME);
-    const source = tex.getSourceImage() as CanvasImageSource;
-    if (!frame || !source) return false;
-    const canvasTex = this.textures.createCanvas('dirt', TILE, TILE);
-    if (!canvasTex) return false;
-    const ctx = canvasTex.getContext();
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(
-      source,
-      frame.cutX,
-      frame.cutY,
-      SOURCE_TILE,
-      SOURCE_TILE,
-      0,
-      0,
-      TILE,
-      TILE
-    );
-    canvasTex.refresh();
-    return this.textures.exists('dirt');
   }
 
   private renderTiles() {

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import confetti from 'canvas-confetti';
 import { GameScene } from './GameScene';
 import {
   DAILY_RESET_HOUR_UTC,
@@ -122,6 +123,7 @@ function startGame(data: InitResponse, map: RuntimeMap) {
 }
 
 async function onFinish(strokes: number, timeMs: number) {
+  launchWinConfetti();
   showResult(strokes, timeMs, null, null);
   try {
     const res = await apiClient.submitScore({ strokes, timeMs });
@@ -135,6 +137,39 @@ async function onFinish(strokes: number, timeMs: number) {
   } catch (err) {
     console.error('score submit failed', err);
   }
+}
+
+function launchWinConfetti() {
+  const common = {
+    disableForReducedMotion: true,
+    scalar: 1.1,
+    ticks: 180,
+    zIndex: 1000,
+  } as const;
+
+  void confetti({
+    ...common,
+    particleCount: 90,
+    spread: 70,
+    origin: { x: 0.5, y: 0.62 },
+  });
+
+  window.setTimeout(() => {
+    void confetti({
+      ...common,
+      particleCount: 55,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 0.76 },
+    });
+    void confetti({
+      ...common,
+      particleCount: 55,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 0.76 },
+    });
+  }, 140);
 }
 
 function showResult(
