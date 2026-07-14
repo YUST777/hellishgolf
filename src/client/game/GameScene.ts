@@ -412,9 +412,11 @@ export class GameScene extends Phaser.Scene {
         const rect = new Phaser.Geom.Rectangle(x - TILE / 2, y - TILE / 2, TILE, TILE);
         if (role === 'water') this.waterRects.push(rect);
         else if (role === 'rough') this.roughRects.push(rect);
-        // Note: these daily maps have a single flag (id 153) that IS the hole's
-        // goal, not an intermediate checkpoint, so it is handled by the finish
-        // zone below — we do not register it as a checkpoint.
+        else if (cleanGid(gid) - 1 === 153) {
+          // The flag doubles as a checkpoint: touching it saves the respawn
+          // point so a later death returns the ball here (not the tee).
+          this.checkpointCells.push({ rect, col, row });
+        }
       }
     }
 
@@ -1038,8 +1040,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
     if (best) {
+      // Respawn right where the flag sits (the ball rests on the platform
+      // just below it), so death returns you to the checkpoint.
       const c = this.cellCenter(best.col, best.row);
-      this.respawn.set(c.x, c.y - TILE);
+      this.respawn.set(c.x, c.y);
     } else {
       this.respawn.copy(this.startPos);
     }
