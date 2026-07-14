@@ -113,6 +113,11 @@ export function isCheckpointGroundId(id: number): boolean {
   return checkpointGroundSet.has(id);
 }
 
+/** True if the tileId is a flag sprite/marker, not physical terrain. */
+export function isFlagId(id: number): boolean {
+  return id === T_CHECKPOINT_FLAG || id === T_FINISH_FLAG;
+}
+
 /**
  * Tiled stores horizontal/vertical/diagonal flip flags in the top 3 bits of a
  * gid. Mask them off to recover the real gid.
@@ -151,6 +156,8 @@ export function roleOfGid(rawGid: number): TileRole {
 
 /** Whether a gid should produce a physics collider. */
 export function isSolidGid(gid: number): boolean {
+  const id = cleanGid(gid) - 1;
+  if (isFlagId(id)) return false;
   const r = roleOfGid(gid);
   return (
     r === 'ground' ||

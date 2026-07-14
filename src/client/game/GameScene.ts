@@ -25,9 +25,18 @@ import {
   ZOOM_LEVELS,
 } from './config';
 import type { RuntimeMap } from '../../shared/tiled';
-import { roleOfGid, rampShapeOfId, cleanGid, TILESET } from '../../shared/tiles';
+import {
+  roleOfGid,
+  rampShapeOfId,
+  cleanGid,
+  isCheckpointGroundId,
+  isFlagId,
+  TILESET,
+} from '../../shared/tiles';
 import { sound } from './sound';
 import { RAPIER } from './physics';
+
+type CheckpointZone = { rect: Phaser.Geom.Rectangle; key: string };
 
 /**
  * Renders a real Kinda Hard Golf Tiled map and runs the ball with the actual
@@ -66,6 +75,8 @@ export class GameScene extends Phaser.Scene {
   /** Sensor rects kept in world pixels for cheap per-frame overlap tests. */
   private waterRects: Phaser.Geom.Rectangle[] = [];
   private roughRects: Phaser.Geom.Rectangle[] = [];
+  private checkpointZones: CheckpointZone[] = [];
+  private activatedCheckpointKeys = new Set<string>();
   /** The checkpoint flag: fires once when the ball reaches it. */
   private flagCell: { col: number; row: number } | null = null;
   private flagSprite: Phaser.GameObjects.Image | null = null;
@@ -120,6 +131,8 @@ export class GameScene extends Phaser.Scene {
     this.finished = false;
     this.waterRects = [];
     this.roughRects = [];
+    this.checkpointZones = [];
+    this.activatedCheckpointKeys = new Set();
     this.flagCell = null;
     this.flagSprite = null;
     this.checkpointDone = false;
@@ -344,10 +357,9 @@ export class GameScene extends Phaser.Scene {
         if (gid <= 0) continue;
         const id = cleanGid(gid) - 1;
         if (rampShapeOfId(id)) continue; // ramps handled as triangles below
-        // The checkpoint FLAG (153) and finish FLAG (154) are decorations, not
-        // walls — only their surrounding ground collides. Making the flag solid
-        // created an invisible block floating above the platform.
-        if (id === 153 || id === 154) continue;
+        // Flags are decorations/sensors, never terrain. Only the platform
+        // tiles around them should create Rapier colliders.
+        if (isFlagId(id)) continue;
         const role = roleOfGid(gid);
         const solid =
           role === 'ground' ||
@@ -410,19 +422,21 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Sensors + finish zone.
+    const checkpointMask: boolean[] = new Array(cols * rows).fill(false);
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const gid = gids[row * cols + col] ?? 0;
         if (gid <= 0) continue;
+        const id = cleanGid(gid) - 1;
         const role = roleOfGid(gid);
         const { x, y } = this.cellCenter(col, row);
         const rect = new Phaser.Geom.Rectangle(x - TILE / 2, y - TILE / 2, TILE, TILE);
         if (role === 'water') this.waterRects.push(rect);
         else if (role === 'rough') this.roughRects.push(rect);
-        // Checkpoints are detected from the checkpoint-ground tiles the ball
-        // rests on (see checkCheckpointGround), not from the flag.
+        if (isCheckpointGroundId(id)) checkpointMask[row * cols + col] = true;
       }
     }
+    this.checkpointZones = this.buildCheckpointZones(checkpointMask);
 
     const f = this.cellCenter(this.map.finish.col, this.map.finish.row);
     this.finishZone = new Phaser.Geom.Rectangle(
@@ -435,6 +449,37 @@ export class GameScene extends Phaser.Scene {
     const sp = this.cellCenter(this.map.spawn.col, this.map.spawn.row);
     this.startPos.set(sp.x, sp.y - TILE * 0.5);
     this.respawn.copy(this.startPos);
+  }
+
+  private buildCheckpointZones(checkpointMask: boolean[]): CheckpointZone[] {
+    const { cols, rows } = this.map;
+    const zones: CheckpointZone[] = [];
+    const padX = TILE * 0.45;
+    const topPad = TILE * 1.25;
+    const bottomPad = TILE * 0.4;
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (!checkpointMask[row * cols + col]) continue;
+
+        const startCol = col;
+        while (col + 1 < cols && checkpointMask[row * cols + col + 1]) col++;
+        const endCol = col;
+        const width = (endCol - startCol + 1) * TILE;
+
+        zones.push({
+          key: `${startCol}-${endCol},${row}`,
+          rect: new Phaser.Geom.Rectangle(
+            startCol * TILE - padX,
+            row * TILE - topPad,
+            width + padX * 2,
+            TILE + topPad + bottomPad
+          ),
+        });
+      }
+    }
+
+    return zones;
   }
 
   private addStaticCuboid(
@@ -916,24 +961,54 @@ export class GameScene extends Phaser.Scene {
     }
     this.inRough = overRough;
 
+    this.checkCheckpointGround();
     this.checkFlagCheckpoint();
   }
 
   /**
+   * Checkpoint platforms are solid tiles, so the ball center rests above the
+   * tile art. The expanded zones built in buildCheckpointZones cover that
+   * playable area and save the exact grounded ball position as the respawn.
+   */
+  private checkCheckpointGround() {
+    if (this.infuriating || this.checkpointZones.length === 0) return;
+    if (!this.isGrounded()) return;
+
+    const ballCircle = new Phaser.Geom.Circle(
+      this.ball.x,
+      this.ball.y,
+      BALL_RADIUS * 0.95
+    );
+    for (const zone of this.checkpointZones) {
+      if (!Phaser.Geom.Intersects.CircleToRectangle(ballCircle, zone.rect)) continue;
+
+      this.respawn.set(this.ball.x, this.ball.y);
+      if (!this.activatedCheckpointKeys.has(zone.key)) {
+        this.activatedCheckpointKeys.add(zone.key);
+        sound.play('Chime', 0.5);
+        this.onCheckpoint?.();
+        this.game.events.emit('checkpoint-reached');
+        this.cameras.main.flash(140, 253, 223, 106);
+      }
+      return;
+    }
+  }
+
+  /**
    * The flag is a walk-through checkpoint. The FIRST time the ball reaches it
-   * (within ~1.5 tiles), it activates ONCE: plays a sound, glows the flag
-   * brightly, and saves the flag's spot as the respawn so a later death returns
-   * the ball here. Never solid — the ball passes through the flag.
+   * while grounded, it activates ONCE: plays a sound, glows the flag brightly,
+   * and saves the current ball spot as the respawn. Never solid — the ball
+   * passes through the flag.
    */
   private checkFlagCheckpoint() {
     if (this.infuriating || this.checkpointDone || !this.flagCell) return;
+    if (!this.isGrounded()) return;
     const c = this.cellCenter(this.flagCell.col, this.flagCell.row);
-    if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, c.x, c.y) > TILE * 1.5) {
+    if (Phaser.Math.Distance.Between(this.ball.x, this.ball.y, c.x, c.y) > TILE * 2) {
       return;
     }
     this.checkpointDone = true;
-    // Respawn where the flag stands (ball rests on the platform just below).
-    this.respawn.set(c.x, c.y);
+    this.respawn.set(this.ball.x, this.ball.y);
     sound.play('Chime', 0.5);
     this.onCheckpoint?.();
     this.game.events.emit('checkpoint-reached');
