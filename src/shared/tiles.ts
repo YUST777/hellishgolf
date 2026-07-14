@@ -28,13 +28,16 @@ export type TileRole =
   | 'ice'
   | 'ramp-up'
   | 'ramp-down'
-  | 'bird';
+  | 'bird'
+  | 'decor';
 
 // --- tileId constants (NOT gids) ------------------------------------------
 export const T_SPAWN = 209;
 export const T_FINISH_FLAG = 154;
 export const T_CHECKPOINT_FLAG = 153;
-export const T_WATER = 176;
+// The daily maps use tile id 175 for water (verified: originally blue in the
+// atlas). 176 is unused, so the old value never matched -> lava never killed.
+export const T_WATER = 175;
 export const T_ICE = 103;
 
 export const T_ROUGH = [496, 497, 498, 499];
@@ -74,6 +77,16 @@ const checkpointGroundSet = new Set(T_CHECKPOINT_GROUND);
 const rampUpSet = new Set(T_RAMP_UP);
 const rampDownSet = new Set(T_RAMP_DOWN);
 const solidSet = new Set(SOLID_TILE_IDS);
+
+/**
+ * Non-colliding, non-rendered marker/decoration tiles baked into some maps:
+ *   10  - a fully transparent marker tile (was becoming an INVISIBLE WALL via
+ *         the solid fallback, blocking the ball near the flag).
+ *   208 - the stray "5" glyph.
+ * They neither block the ball nor render.
+ */
+export const T_DECOR = [10, 208];
+const decorSet = new Set(T_DECOR);
 
 export type RampShape =
   | 'ground-up'
@@ -118,8 +131,9 @@ export function roleOfId(id: number): TileRole {
   if (rampUpSet.has(id)) return 'ramp-up';
   if (rampDownSet.has(id)) return 'ramp-down';
   if (birdSet.has(id)) return 'bird';
-  if (solidSet.has(id)) return 'ground';
-  // Unknown non-empty tiles: treat as solid so unexpected art still blocks.
+  if (decorSet.has(id)) return 'decor';
+  // Unknown non-empty tiles fall back to solid so real walls (whose exact ids
+  // aren't all enumerated) keep blocking the ball.
   return 'ground';
 }
 

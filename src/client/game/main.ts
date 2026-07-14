@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { GameScene } from './GameScene';
 import {
+  DAILY_RESET_HOUR_UTC,
   DEFAULT_ZOOM,
+  INFURIATING_STORAGE_KEY,
   TILESET_URL,
   ZOOM_LEVELS,
   ZOOM_STORAGE_KEY,
@@ -19,6 +21,22 @@ function readZoom(): number {
   const raw = Number(localStorage.getItem(ZOOM_STORAGE_KEY));
   return (ZOOM_LEVELS as readonly number[]).includes(raw) ? raw : DEFAULT_ZOOM;
 }
+
+/** Read the persisted Infuriating Mode preference (checkpoints disabled). */
+function readInfuriating(): boolean {
+  return localStorage.getItem(INFURIATING_STORAGE_KEY) === 'true';
+}
+
+/** Milliseconds until the next daily hole rollover at 05:00 UTC. */
+function msUntilNextHole(): number {
+  const now = new Date();
+  const next = new Date(now);
+  next.setUTCHours(DAILY_RESET_HOUR_UTC, 0, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+let countdownTimer: number | null = null;
 
 /**
  * Client bootstrap. Fetches the post's hole (a real mirrored Tiled map) from
@@ -54,6 +72,7 @@ function sceneData() {
   return {
     map: runtimeMap!,
     zoom: readZoom(),
+    infuriating: readInfuriating(),
     onStroke: (n: number) => setHud(n, init?.bestToday ?? null, init?.streak ?? 0),
     // The checkpoint banner is driven by the 'checkpoint-reached' scene event.
     onCheckpoint: () => {},
@@ -128,6 +147,30 @@ function showResult(
   el('result-time').textContent = `${(timeMs / 1000).toFixed(1)}s`;
   el('result-rank').textContent =
     rank && total ? `Rank ${rank} of ${total}` : 'Submitting\u2026';
+  startCountdown();
+}
+
+/** Live "New hole in HH:MM:SS" countdown on the result modal. */
+function startCountdown() {
+  const tick = () => {
+    let ms = msUntilNextHole();
+    if (ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    el('result-countdown').textContent = `${hh}:${mm}:${ss}`;
+  };
+  tick();
+  if (countdownTimer !== null) window.clearInterval(countdownTimer);
+  countdownTimer = window.setInterval(tick, 1000);
+}
+
+function stopCountdown() {
+  if (countdownTimer !== null) {
+    window.clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
 }
 
 async function loadLeaderboard() {
@@ -171,11 +214,29 @@ function retry() {
   hide('result-overlay');
   hide('menu-overlay');
   hide('reset-overlay');
+  stopCountdown();
   el('return-button').classList.remove('show');
   if (game && init && runtimeMap) {
     game.scene.stop('game');
     game.scene.start('game', sceneData());
   }
+}
+
+/** Reflect Infuriating Mode on the settings button and the title fire badge. */
+function paintInfuriating() {
+  const on = readInfuriating();
+  const btn = document.getElementById('settings-infuriating');
+  if (btn) btn.textContent = on ? 'On' : 'Off';
+  const badge = document.getElementById('infuriating-badge');
+  if (badge) badge.style.display = on ? 'inline' : 'none';
+}
+
+function toggleInfuriating() {
+  const next = !readInfuriating();
+  localStorage.setItem(INFURIATING_STORAGE_KEY, String(next));
+  paintInfuriating();
+  // Restart the hole so the checkpoint change takes effect immediately.
+  retry();
 }
 
 /** Reflect the current mute state onto both the HUD icon and settings button. */
@@ -228,6 +289,7 @@ function wireUi() {
     hide('menu-overlay');
     paintZoomChoices();
     paintSound();
+    paintInfuriating();
     show('settings-overlay');
   });
   el('menu-return').addEventListener('click', () => {
@@ -248,6 +310,7 @@ function wireUi() {
     hide('settings-overlay')
   );
   el('settings-sound').addEventListener('click', toggleSound);
+  el('settings-infuriating').addEventListener('click', toggleInfuriating);
   el('zoom-choices')
     .querySelectorAll<HTMLButtonElement>('button')
     .forEach((b) => {
@@ -277,6 +340,9 @@ function wireUi() {
   // Mute toggle.
   paintSound();
   el('btn-mute').addEventListener('click', toggleSound);
+
+  // Reflect Infuriating Mode state on the title badge at startup.
+  paintInfuriating();
 }
 
 /** Bridge scene events to the DOM shell once the game exists. */

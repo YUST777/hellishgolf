@@ -28,7 +28,8 @@ export type Sfx =
   | 'Back'
   | 'Leaves'
   | 'Squawk'
-  | 'Ambient';
+  | 'Ambient'
+  | 'LavaDrop';
 
 const FILES: Record<Sfx, string> = {
   BallHit: 'impactPlate_light_003',
@@ -40,7 +41,11 @@ const FILES: Record<Sfx, string> = {
   Leaves: 'leaves',
   Squawk: 'squawk',
   Ambient: 'ambient_birds',
+  LavaDrop: 'golf_drop_lava',
 };
+
+/** Sounds that only ship as .mp3 (no .ogg variant). */
+const MP3_ONLY = new Set<Sfx>(['LavaDrop']);
 
 /** Pick the audio type the browser can play (ogg preferred, mp3 fallback). */
 function pickExt(): 'ogg' | 'mp3' {
@@ -63,9 +68,10 @@ class SoundManager {
     // Build a tiny pool per SFX so rapid repeats (bounces) can overlap.
     (Object.keys(FILES) as Sfx[]).forEach((key) => {
       if (key === 'Ambient') return;
+      const ext = MP3_ONLY.has(key) ? 'mp3' : this.ext;
       const pool: HTMLAudioElement[] = [];
       for (let i = 0; i < 4; i++) {
-        const el = new Audio(`${BASE}/${FILES[key]}.${this.ext}`);
+        const el = new Audio(`${BASE}/${FILES[key]}.${ext}`);
         el.preload = 'auto';
         pool.push(el);
       }

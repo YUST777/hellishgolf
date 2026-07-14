@@ -6,7 +6,10 @@ import {
   BALL_RADIUS,
   BALL_RADIUS_METERS,
   BALL_RESTITUTION,
-  BALL_SLOW_DAMPING,
+  BALL_SETTLE_DAMPING,
+  BALL_SETTLE_RESTITUTION,
+  BALL_SLOW_SPEED,
+  BALL_VISUAL_RADIUS,
   COLORS,
   DEFAULT_ZOOM,
   DIRT_FRAME,
@@ -45,9 +48,11 @@ export class GameScene extends Phaser.Scene {
 
   private ball!: Phaser.GameObjects.Image;
   private aiming = false;
+  private aimStart = 0;
   private aimGfx!: Phaser.GameObjects.Graphics;
 
   private zoom = DEFAULT_ZOOM;
+  private infuriating = false;
   private pinchPrevDist = 0;
 
   private strokes = 0;
@@ -55,22 +60,42 @@ export class GameScene extends Phaser.Scene {
   private finished = false;
 
   private respawn = new Phaser.Math.Vector2();
-  private lastCheckpointKey = '';
+  /** The spawn/tee, used as the fallback respawn before any checkpoint. */
+  private startPos = new Phaser.Math.Vector2();
 
   /** Sensor rects kept in world pixels for cheap per-frame overlap tests. */
   private waterRects: Phaser.Geom.Rectangle[] = [];
   private roughRects: Phaser.Geom.Rectangle[] = [];
   private checkpointCells: { rect: Phaser.Geom.Rectangle; col: number; row: number }[] =
     [];
+  /** Keys of activated checkpoints, and the flag sprite for each cell. */
+  private activatedCps = new Set<string>();
+  private cpFlags = new Map<string, Phaser.GameObjects.Image>();
   private finishZone!: Phaser.Geom.Rectangle;
 
   private lastBounceAt = 0;
   private inRough = false;
   private groundHandles = new Set<number>();
+  /** Squash/stretch pulse state (idle when elapsed >= 15). */
+  private squashElapsed = 15;
+  private squashAngle = 0;
+  private squashIntensity = 0;
+  /** True during the lava-death delay so it doesn't re-trigger. */
+  private dying = false;
+  /** Current damping/restitution so we only push changes to Rapier on switch. */
+  private curDamping = BALL_LINEAR_DAMPING;
+  private curRestitution = BALL_RESTITUTION;
 
   private onStroke?: (n: number) => void;
   private onFinish?: (n: number, t: number) => void;
   private onCheckpoint?: () => void;
+
+  /** Cursor CSS strings (image + hotspot) for each interaction state. */
+  private static readonly CURSOR = {
+    default: 'url(game/cursors/mouse_default.png) 0 0, auto',
+    grab: 'url(game/cursors/hand_open.png) 12 8, grab',
+    shoot: 'url(game/cursors/mouse_shoot.png) 16 16, crosshair',
+  } as const;
 
   constructor() {
     super('game');
@@ -79,23 +104,31 @@ export class GameScene extends Phaser.Scene {
   init(data: {
     map: RuntimeMap;
     zoom?: number;
+    infuriating?: boolean;
     onStroke?: (n: number) => void;
     onFinish?: (n: number, t: number) => void;
     onCheckpoint?: () => void;
   }) {
     this.map = data.map;
     this.zoom = data.zoom ?? DEFAULT_ZOOM;
+    this.infuriating = data.infuriating ?? false;
     this.onStroke = data.onStroke;
     this.onFinish = data.onFinish;
     this.onCheckpoint = data.onCheckpoint;
     this.strokes = 0;
     this.finished = false;
-    this.lastCheckpointKey = '';
     this.waterRects = [];
     this.roughRects = [];
     this.checkpointCells = [];
+    this.activatedCps = new Set();
+    this.cpFlags = new Map();
     this.accumulator = 0;
     this.groundHandles = new Set();
+    this.squashElapsed = 15;
+    this.squashIntensity = 0;
+    this.dying = false;
+    this.curDamping = BALL_LINEAR_DAMPING;
+    this.curRestitution = BALL_RESTITUTION;
   }
 
   // --- unit helpers -------------------------------------------------------
@@ -138,6 +171,8 @@ export class GameScene extends Phaser.Scene {
     this.setupMenuBridge();
     sound.init();
 
+    this.input.setDefaultCursor(GameScene.CURSOR.default);
+
     this.startTime = this.time.now;
     this.cameras.main.startFollow(this.ball, false, 0.12, 0.12);
   }
@@ -161,8 +196,12 @@ export class GameScene extends Phaser.Scene {
           else if (this.pinchPrevDist - dist > 40) this.stepZoom(1);
         }
         this.pinchPrevDist = dist;
-        this.aiming = false;
-        this.aimGfx.clear();
+        if (this.aiming) {
+          this.aiming = false;
+          this.aimGfx.clear();
+          this.restoreZoom();
+          this.setCursor('default');
+        }
       } else {
         this.pinchPrevDist = 0;
       }
@@ -274,7 +313,13 @@ export class GameScene extends Phaser.Scene {
         if (gid <= 0) continue;
         const frame = gid - 1;
         if (frame < 0 || frame >= frameCount) continue;
+        const role = roleOfGid(gid);
+        // Skip decoration glyphs (e.g. the stray "5") entirely.
+        if (role === 'decor') continue;
         const { x, y } = this.cellCenter(col, row);
+
+        // Static (non-animated) tile art, including the recolored lava and the
+        // goal flag (drawn normally, no tint).
         this.add
           .image(x, y, 'tileset', frame)
           .setDisplaySize(TILE + 1, TILE + 1)
@@ -296,6 +341,10 @@ export class GameScene extends Phaser.Scene {
         if (gid <= 0) continue;
         const id = cleanGid(gid) - 1;
         if (rampShapeOfId(id)) continue; // ramps handled as triangles below
+        // The checkpoint FLAG (153) and finish FLAG (154) are decorations, not
+        // walls — only their surrounding ground collides. Making the flag solid
+        // created an invisible block floating above the platform.
+        if (id === 153 || id === 154) continue;
         const role = roleOfGid(gid);
         const solid =
           role === 'ground' ||
@@ -367,9 +416,9 @@ export class GameScene extends Phaser.Scene {
         const rect = new Phaser.Geom.Rectangle(x - TILE / 2, y - TILE / 2, TILE, TILE);
         if (role === 'water') this.waterRects.push(rect);
         else if (role === 'rough') this.roughRects.push(rect);
-        else if (role === 'checkpoint' && cleanGid(gid) - 1 === 153) {
-          this.checkpointCells.push({ rect, col, row });
-        }
+        // Note: these daily maps have a single flag (id 153) that IS the hole's
+        // goal, not an intermediate checkpoint, so it is handled by the finish
+        // zone below — we do not register it as a checkpoint.
       }
     }
 
@@ -382,7 +431,8 @@ export class GameScene extends Phaser.Scene {
     );
 
     const sp = this.cellCenter(this.map.spawn.col, this.map.spawn.row);
-    this.respawn.set(sp.x, sp.y - TILE * 0.5);
+    this.startPos.set(sp.x, sp.y - TILE * 0.5);
+    this.respawn.copy(this.startPos);
   }
 
   private addStaticCuboid(
@@ -465,14 +515,89 @@ export class GameScene extends Phaser.Scene {
       .setCanSleep(false);
     this.ballBody = this.world.createRigidBody(bodyDesc);
 
+    // Exact ball collider from the bundle: ball(0.3), restitution 0.86,
+    // friction 0.1, high contact-force threshold. Collision events enabled so
+    // we can play the wall/ground bounce SFX.
     const colDesc = RAPIER.ColliderDesc.ball(BALL_RADIUS_METERS)
       .setRestitution(BALL_RESTITUTION)
       .setFriction(BALL_FRICTION)
-      .setDensity(1)
+      .setContactForceEventThreshold(1e6)
       .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     this.ballCollider = this.world.createCollider(colDesc, this.ballBody);
 
-    this.ball = this.add.image(this.respawn.x, this.respawn.y, 'ball').setDepth(40);
+    this.ensureBallTexture();
+    this.ball = this.add.image(this.respawn.x, this.respawn.y, 'hgball').setDepth(40);
+  }
+
+  /**
+   * Build the ball texture to match the bundle: white body (r=18) with a dark
+   * outline, an offset drop shadow, a soft warm highlight upper-left, and a few
+   * dimples. Drawn once into a reusable texture.
+   */
+  private ensureBallTexture() {
+    if (this.textures.exists('hgball')) return;
+    const R = BALL_VISUAL_RADIUS;
+    const pad = 6;
+    const c = R + pad; // texture centre
+    const size = c * 2;
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+
+    // Drop shadow (offset down-right).
+    g.fillStyle(0x000000, 0.3);
+    g.fillCircle(c + 3, c + 3, R);
+    // Dark base ring / outline backing.
+    g.fillStyle(0x000000, 0.7);
+    g.fillCircle(c, c, R + 1);
+    // White body.
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(c, c, R);
+    // Soft warm highlights upper-left (kept small so they stay on the ball).
+    g.fillStyle(0xfff4e5, 0.18);
+    g.fillCircle(c - 6, c - 6, R * 0.55);
+    g.fillStyle(0xfff4e5, 0.15);
+    g.fillCircle(c - 6.3, c - 6.3, R * 0.38);
+    // Dimples.
+    g.fillStyle(0xe6e6e6, 0.9);
+    const dimples = [
+      { x: 4, y: 6 },
+      { x: -7, y: 3 },
+      { x: 6, y: -4 },
+      { x: -3, y: -8 },
+      { x: 9, y: -2 },
+      { x: -9, y: -3 },
+      { x: 1, y: 10 },
+    ];
+    for (const d of dimples) g.fillCircle(c + d.x, c + d.y, 1.1);
+    // Outline.
+    g.lineStyle(2, 0x1a1a1a, 1);
+    g.strokeCircle(c, c, R);
+
+    g.generateTexture('hgball', size, size);
+    g.destroy();
+  }
+
+  /** Trigger the squash/stretch pulse along `angle` with `intensity` (0..1). */
+  private triggerSquash(angle: number, intensity: number) {
+    this.squashAngle = angle;
+    this.squashIntensity = Phaser.Math.Clamp(intensity, 0, 1);
+    this.squashElapsed = 0;
+  }
+
+  /** Advance the damped squash oscillation and apply it to the ball scale. */
+  private updateSquash(deltaTicks: number) {
+    if (this.squashElapsed >= 15) {
+      this.ball.setScale(1, 1);
+      return;
+    }
+    this.squashElapsed += deltaTicks;
+    const e = Math.min(1, this.squashElapsed / 15);
+    if (e >= 1) {
+      this.ball.setScale(1, 1);
+      return;
+    }
+    const i = Math.sin(e * Math.PI * 2) * Math.exp(-3 * e);
+    this.ball.scaleX = 1 + Math.cos(this.squashAngle) * i * 0.2 * this.squashIntensity;
+    this.ball.scaleY = 1 + Math.sin(this.squashAngle) * i * 0.2 * this.squashIntensity;
   }
 
   // --- input --------------------------------------------------------------
@@ -486,23 +611,80 @@ export class GameScene extends Phaser.Scene {
     return this.ballSpeed() < REST_SPEED;
   }
 
+  /** True if the ball collider is currently touching any solid collider. */
+  private isGrounded(): boolean {
+    let grounded = false;
+    this.world.contactPairsWith(this.ballCollider, (other) => {
+      if (this.groundHandles.has(other.handle)) grounded = true;
+    });
+    return grounded;
+  }
+
+  /**
+   * Mirrors the bundle's per-step settle logic: when the ball is slow AND
+   * grounded, linear damping is raised (0.4 -> 4) and restitution dropped
+   * (0.86 -> 0.3) so it comes to rest instead of bouncing forever. Otherwise
+   * the lively defaults are restored. Values only pushed to Rapier on change.
+   */
+  private applySettleModel() {
+    const slow = this.ballSpeed() < BALL_SLOW_SPEED;
+    const settle = slow && this.isGrounded();
+    const damping = settle ? BALL_SETTLE_DAMPING : BALL_LINEAR_DAMPING;
+    const restitution = settle ? BALL_SETTLE_RESTITUTION : BALL_RESTITUTION;
+
+    if (damping !== this.curDamping) {
+      this.ballBody.setLinearDamping(damping);
+      this.curDamping = damping;
+    }
+    if (restitution !== this.curRestitution) {
+      this.ballCollider.setRestitution(restitution);
+      this.curRestitution = restitution;
+    }
+  }
+
+  /** How close (world px) the pointer must be to the ball to "grab" it. */
+  private nearBall(p: Phaser.Input.Pointer): boolean {
+    const w = this.cameras.main.getWorldPoint(p.x, p.y);
+    return (
+      Phaser.Math.Distance.Between(w.x, w.y, this.ball.x, this.ball.y) <=
+      BALL_RADIUS * 6
+    );
+  }
+
+  private setCursor(state: keyof typeof GameScene.CURSOR) {
+    this.input.setDefaultCursor(GameScene.CURSOR[state]);
+  }
+
   private setupInput() {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       sound.startAmbient();
       if (this.finished || !this.ballResting()) return;
       // Aim only when the press starts on/near the ball, like the original.
-      const w = this.cameras.main.getWorldPoint(p.x, p.y);
-      const near = Phaser.Math.Distance.Between(w.x, w.y, this.ball.x, this.ball.y);
-      if (near <= BALL_RADIUS * 6) this.aiming = true;
+      if (this.nearBall(p)) {
+        this.aiming = true;
+        this.aimStart = this.time.now;
+        this.setCursor('shoot');
+      }
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (this.aiming) this.drawAim(p);
+      if (this.aiming) {
+        this.drawAim(p);
+        return;
+      }
+      // Idle hover: open hand over a grabbable (resting) ball, else default.
+      if (!this.finished && !this.dying && this.ballResting() && this.nearBall(p)) {
+        this.setCursor('grab');
+      } else {
+        this.setCursor('default');
+      }
     });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
       if (!this.aiming) return;
       this.aiming = false;
       this.aimGfx.clear();
       this.shoot(p);
+      // Back to grab if still hovering the (now moving) ball, else default.
+      this.setCursor(this.nearBall(p) ? 'grab' : 'default');
     });
   }
 
@@ -516,32 +698,91 @@ export class GameScene extends Phaser.Scene {
     return v;
   }
 
+  /**
+   * Power -> colour ramp for the aim indicator and ball tint (white at rest,
+   * warming through yellow to red at full power).
+   */
+  private powerColor(power: number): number {
+    const lerp = (a: number, b: number, t: number) => {
+      const c = Phaser.Display.Color.Interpolate.ColorWithColor(
+        Phaser.Display.Color.ValueToColor(a),
+        Phaser.Display.Color.ValueToColor(b),
+        100,
+        Math.round(t * 100)
+      );
+      return Phaser.Display.Color.GetColor(c.r, c.g, c.b);
+    };
+    if (power < 0.5) return lerp(0xffffff, 0xffd23d, power * 2);
+    return lerp(0xffd23d, 0xff3b1a, (power - 0.5) * 2);
+  }
+
+  /**
+   * Throw indicator mirrored from the bundle's `Cg` draw: a black backing line
+   * plus a colour line from the ball to the pulled point, a filled dot at that
+   * point, and a power tint on the ball. The pulled length uses power^(1/1.2)
+   * so the visual matches perceived power, and the camera zooms out as you
+   * charge (zoom * (1 - 0.676 * power * ease)).
+   */
   private drawAim(p: Phaser.Input.Pointer) {
     const v = this.dragVector(p);
-    const power = v.length() / MAX_DRAG;
+    const raw = Math.min(1, v.length() / MAX_DRAG);
     this.aimGfx.clear();
-    const dir = v.clone().normalize();
-    const len = 24 + power * 88;
-    const c = Phaser.Display.Color.Interpolate.ColorWithColor(
-      Phaser.Display.Color.ValueToColor(COLORS.aim),
-      Phaser.Display.Color.ValueToColor(COLORS.aimPower),
-      100,
-      Math.round(power * 100)
-    );
-    const col = Phaser.Display.Color.GetColor(c.r, c.g, c.b);
-    this.aimGfx.fillStyle(col, 0.9);
-    const dots = 8;
-    for (let i = 1; i <= dots; i++) {
-      const t = (i / dots) * len;
-      this.aimGfx.fillCircle(this.ball.x + dir.x * t, this.ball.y + dir.y * t, 3);
+
+    const launch = v.clone().normalize(); // direction the ball will travel
+    // Pulled point sits opposite the launch (the slingshot band you pull).
+    const visualLen = Math.pow(raw, 1 / POWER_EXP) * MAX_DRAG;
+    const px = this.ball.x - launch.x * visualLen;
+    const py = this.ball.y - launch.y * visualLen;
+
+    const col = this.powerColor(raw);
+    const z = this.cameras.main.zoom || 1;
+    const wBlack = 5 / z;
+    const wColor = 3 / z;
+    const dot = 5 / z;
+
+    // Power tint glow on the ball (alpha = min(0.3, 0.3*power)).
+    if (raw > 0.1) {
+      this.aimGfx.fillStyle(col, Math.min(0.3, 0.3 * raw));
+      this.aimGfx.fillCircle(this.ball.x, this.ball.y, BALL_RADIUS + 2);
     }
-    this.aimGfx.lineStyle(3, col, 0.8);
-    this.aimGfx.strokeCircle(this.ball.x, this.ball.y, BALL_RADIUS + 6 + power * 8);
+    // Black backing line.
+    this.aimGfx.lineStyle(wBlack, 0x000000, 0.3);
+    this.aimGfx.beginPath();
+    this.aimGfx.moveTo(this.ball.x, this.ball.y);
+    this.aimGfx.lineTo(px, py);
+    this.aimGfx.strokePath();
+    // Colour line + end dot.
+    this.aimGfx.lineStyle(wColor, col, 0.9);
+    this.aimGfx.beginPath();
+    this.aimGfx.moveTo(this.ball.x, this.ball.y);
+    this.aimGfx.lineTo(px, py);
+    this.aimGfx.strokePath();
+    this.aimGfx.fillStyle(col, 0.9);
+    this.aimGfx.fillCircle(px, py, dot);
+
+    this.applyChargeZoom(raw);
+  }
+
+  /** Ease-in charge zoom-out: camera pulls back as power builds. */
+  private applyChargeZoom(power: number) {
+    const elapsed = this.time.now - this.aimStart;
+    const t = Phaser.Math.Clamp(elapsed / 370, 0, 1); // ~22 frames @60fps
+    const ease = 1 - (1 - t) * (1 - t);
+    const target = this.zoom * (1 - 0.676 * power * ease);
+    this.cameras.main.setZoom(target);
+  }
+
+  /** Restore the resting zoom after a shot / cancelled aim. */
+  private restoreZoom() {
+    this.cameras.main.zoomTo(this.zoom, 140);
   }
 
   private shoot(p: Phaser.Input.Pointer) {
     const v = this.dragVector(p);
-    if (v.length() < 4) return;
+    if (v.length() < 4) {
+      this.restoreZoom();
+      return;
+    }
     this.strokes += 1;
     this.onStroke?.(this.strokes);
     // Original: snap power to 0.005 steps, velocity = dir * pow(power,1.2)*150.
@@ -552,7 +793,10 @@ export class GameScene extends Phaser.Scene {
     const speed = power * MAX_LAUNCH_SPEED;
     this.ballBody.setLinvel({ x: dir.x * speed, y: dir.y * speed }, true);
     this.ballBody.setAngvel(0, true);
+    // Stretch along the launch direction for that satisfying "lunge".
+    this.triggerSquash(Math.atan2(dir.y, dir.x), Math.max(0.35, raw));
     sound.play('BallHit', 0.3 * raw);
+    this.restoreZoom();
   }
 
   private resetToRespawn() {
@@ -574,26 +818,25 @@ export class GameScene extends Phaser.Scene {
     this.accumulator += Math.min(delta, 100) / 1000;
     let steps = 0;
     while (this.accumulator >= PHYSICS_TIMESTEP && steps < 8) {
-      // Damping switch mirrors the bundle: lighter damping at low-ish speeds.
-      const spd = Math.hypot(
-        this.ballBody.linvel().x,
-        this.ballBody.linvel().y
-      );
-      this.ballBody.setLinearDamping(
-        spd > 0.1 && spd < 0.8 ? BALL_SLOW_DAMPING : BALL_LINEAR_DAMPING
-      );
+      this.applySettleModel();
       this.world.step(this.eventQueue);
       this.drainEvents();
       this.accumulator -= PHYSICS_TIMESTEP;
       steps++;
     }
 
-    const t = this.ballBody.translation();
-    this.ball.x = t.x * PIXELS_PER_METER;
-    this.ball.y = t.y * PIXELS_PER_METER;
-    this.ball.rotation = this.ballBody.rotation();
+    // While drowning, the death tween owns the ball's position/scale/alpha, so
+    // don't overwrite it from physics.
+    if (!this.dying) {
+      const t = this.ballBody.translation();
+      this.ball.x = t.x * PIXELS_PER_METER;
+      this.ball.y = t.y * PIXELS_PER_METER;
+      this.ball.rotation = this.ballBody.rotation();
+      // Squash/stretch pulse (delta in ~60fps ticks, like the bundle).
+      this.updateSquash(delta / (1000 / 60));
+    }
 
-    if (this.finished) return;
+    if (this.finished || this.dying) return;
 
     this.handleSensors();
 
@@ -601,7 +844,8 @@ export class GameScene extends Phaser.Scene {
 
     if (
       Phaser.Geom.Rectangle.Contains(this.finishZone, this.ball.x, this.ball.y) &&
-      this.ballResting()
+      this.ballResting() &&
+      this.isGrounded()
     ) {
       this.finish();
     }
@@ -619,6 +863,12 @@ export class GameScene extends Phaser.Scene {
       if (speed > 0.4 && this.time.now - this.lastBounceAt > 60) {
         this.lastBounceAt = this.time.now;
         sound.play('BallBounce', Math.min(0.9, 0.9 * (speed / 6)));
+        // Squash along the current travel direction, scaled by impact speed.
+        const v = this.ballBody.linvel();
+        this.triggerSquash(
+          Math.atan2(v.y, v.x),
+          Math.min(1, speed / 6)
+        );
       }
     });
   }
@@ -627,8 +877,11 @@ export class GameScene extends Phaser.Scene {
     const bx = this.ball.x;
     const by = this.ball.y;
 
+    // Lava kills on TOUCH, but require a real overlap (not just grazing the
+    // edge) so rolling along a ledge next to lava isn't an unfair death.
+    const ballCircle = new Phaser.Geom.Circle(bx, by, BALL_RADIUS * 0.7);
     for (const r of this.waterRects) {
-      if (Phaser.Geom.Rectangle.Contains(r, bx, by)) {
+      if (Phaser.Geom.Intersects.CircleToRectangle(ballCircle, r)) {
         this.hitWater();
         return;
       }
@@ -648,31 +901,152 @@ export class GameScene extends Phaser.Scene {
     }
     this.inRough = overRough;
 
-    for (const cp of this.checkpointCells) {
-      if (Phaser.Geom.Rectangle.Contains(cp.rect, bx, by)) {
-        this.hitCheckpoint(cp.col, cp.row);
+    // Kinda Infuriating Mode disables checkpoints entirely.
+    if (!this.infuriating) {
+      for (const cp of this.checkpointCells) {
+        if (Phaser.Geom.Rectangle.Contains(cp.rect, bx, by)) {
+          this.hitCheckpoint(cp.col, cp.row);
+        }
       }
     }
   }
 
+  /**
+   * Lava death, mirroring the bundle: on contact play the splash + a burst of
+   * lava particles, then wait ~500ms (the ball keeps sinking) before returning
+   * to the last checkpoint with the return sound. A guard stops it re-firing
+   * during the delay.
+   */
+  /**
+   * Lava death: play the splash SFX + a molten particle burst, then a ~500ms
+   * drowning animation where the ball sinks into the lava (shrinks + fades)
+   * before returning to the last checkpoint with the return sound. A guard
+   * stops it re-firing, and the update loop yields the ball to this tween.
+   */
   private hitWater() {
-    if (this.finished) return;
-    // Lava hazard: a hot orange flash instead of the old blue splash.
-    sound.play('Splash', 0.2);
-    this.cameras.main.flash(180, 255, 90, 20);
-    this.resetToRespawn();
+    if (this.finished || this.dying) return;
+    this.dying = true;
+    sound.play('LavaDrop', 0.6);
+    this.spawnLavaBurst(this.ball.x, this.ball.y);
+    this.cameras.main.flash(160, 255, 90, 20);
+
+    // Freeze physics and snap the sprite to the ball, then sink it in.
+    this.ballBody.setLinvel({ x: 0, y: 0 }, true);
+    this.ballBody.setAngvel(0, true);
+    const t = this.ballBody.translation();
+    this.ball.x = t.x * PIXELS_PER_METER;
+    this.ball.y = t.y * PIXELS_PER_METER;
+
+    // Burn-out: the ball ignites (bright orange), chars to dark, and fades away
+    // while sinking slightly — it keeps its size (no shrinking).
+    const startY = this.ball.y;
+    const hot = Phaser.Display.Color.ValueToColor(0xffd23d);
+    const char = Phaser.Display.Color.ValueToColor(0x2a0a06);
+    const burn = { t: 0 };
+    this.tweens.add({
+      targets: burn,
+      t: 1,
+      duration: 520,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        const c = Phaser.Display.Color.Interpolate.ColorWithColor(
+          hot,
+          char,
+          100,
+          Math.round(burn.t * 100)
+        );
+        this.ball.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
+        this.ball.setAlpha(1 - burn.t);
+        this.ball.y = startY + TILE * 0.35 * burn.t;
+      },
+      onComplete: () => {
+        this.resetToRespawn();
+        this.ball.clearTint();
+        this.ball.setAlpha(1);
+        this.ball.setScale(1, 1);
+        sound.play('Back', 0.2);
+        this.dying = false;
+      },
+    });
   }
 
+  /** Small burst of fading molten particles at (x, y). */
+  private spawnLavaBurst(x: number, y: number) {
+    for (let i = 0; i < 8; i++) {
+      const p = this.add.circle(
+        x,
+        y,
+        1 + Math.random() * 2,
+        Math.random() < 0.5 ? 0xff7a1a : 0xffd23d
+      );
+      p.setDepth(45);
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 20 + Math.random() * 60;
+      this.tweens.add({
+        targets: p,
+        x: x + Math.cos(ang) * spd,
+        y: y + Math.sin(ang) * spd - 20,
+        alpha: 0,
+        duration: 400 + Math.random() * 200,
+        ease: 'Quad.easeOut',
+        onComplete: () => p.destroy(),
+      });
+    }
+  }
+
+  /**
+   * Activate a checkpoint on contact (mirrors the bundle): add it to the
+   * activated set, play the Chime, light up its flag, and move the respawn to
+   * the FURTHEST-progressed activated checkpoint (closest to the finish) so
+   * dropping back onto an earlier checkpoint never loses progress.
+   */
   private hitCheckpoint(col: number, row: number) {
     const key = `${col},${row}`;
-    if (this.lastCheckpointKey === key) return;
-    this.lastCheckpointKey = key;
-    const c = this.cellCenter(col, row);
-    this.respawn.set(c.x, c.y - TILE);
+    if (this.activatedCps.has(key)) return;
+    this.activatedCps.add(key);
+
+    // Light the flag to show it's active.
+    const flag = this.cpFlags.get(key);
+    if (flag) {
+      flag.clearTint();
+      this.tweens.add({
+        targets: flag,
+        scaleX: flag.scaleX * 1.25,
+        scaleY: flag.scaleY * 1.25,
+        duration: 130,
+        yoyo: true,
+        ease: 'Quad.easeOut',
+      });
+    }
+
+    this.updateRespawnFromCheckpoints();
     this.onCheckpoint?.();
     this.game.events.emit('checkpoint-reached');
     sound.play('Chime', 0.2);
     this.cameras.main.flash(140, 253, 223, 106);
+  }
+
+  /** Set respawn to the activated checkpoint nearest the finish (furthest
+   *  progressed), or the tee if none are active. */
+  private updateRespawnFromCheckpoints() {
+    const f = this.cellCenter(this.map.finish.col, this.map.finish.row);
+    let best: { col: number; row: number } | null = null;
+    let bestDist = Infinity;
+    for (const cp of this.checkpointCells) {
+      if (!this.activatedCps.has(`${cp.col},${cp.row}`)) continue;
+      const c = this.cellCenter(cp.col, cp.row);
+      const d = Phaser.Math.Distance.Squared(c.x, c.y, f.x, f.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = cp;
+      }
+    }
+    if (best) {
+      const c = this.cellCenter(best.col, best.row);
+      this.respawn.set(c.x, c.y - TILE);
+    } else {
+      this.respawn.copy(this.startPos);
+    }
   }
 
   private finish() {

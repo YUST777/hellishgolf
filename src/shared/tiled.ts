@@ -56,35 +56,45 @@ function gidAt(gids: number[], cols: number, col: number, row: number): number {
 export function parseTiledMap(json: TiledMapJson): RuntimeMap {
   const cols = json.width;
   const rows = json.height;
-  const tileLayer = json.layers.find((l) => l.type === 'tilelayer' && l.data);
+  // Some mirrored maps omit `type: "tilelayer"` on the layer (just a named
+  // "terrain" layer with a data array). Match by the presence of a numeric
+  // data array so those holes aren't parsed as empty.
+  const tileLayer = json.layers.find(
+    (l) => Array.isArray(l.data) && l.data.length > 0
+  );
   const raw = tileLayer?.data ?? [];
   const gids = raw.map((v) => v & FLIP_MASK);
 
   const checkpoints: RuntimeCell[] = [];
-  const finishCells: RuntimeCell[] = [];
+  const flagCells: RuntimeCell[] = [];
+  const finishGroundCells: RuntimeCell[] = [];
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const gid = gids[row * cols + col] ?? 0;
       if (gid <= 0) continue;
       const id = gid - 1;
-      if (id === checkpointFlagGid) checkpoints.push({ col, row });
-      if (finishGidSet.has(id)) finishCells.push({ col, row });
+      if (id === checkpointFlagGid) {
+        checkpoints.push({ col, row });
+        flagCells.push({ col, row });
+      }
+      if (finishGidSet.has(id)) finishGroundCells.push({ col, row });
     }
   }
 
-  // Finish = centroid-ish top of the finish-ground cluster.
-  let finish: RuntimeCell;
-  if (finishCells.length > 0) {
-    const minRow = Math.min(...finishCells.map((c) => c.row));
-    const top = finishCells.filter((c) => c.row === minRow);
-    const avgCol = Math.round(
-      top.reduce((s, c) => s + c.col, 0) / top.length
-    );
-    finish = { col: avgCol, row: minRow };
-  } else {
-    finish = { col: Math.floor(cols / 2), row: 1 };
-  }
+  // The daily holes have a single flag that IS the goal. Anchor the finish on
+  // that flag when present; otherwise fall back to the finish-ground cluster,
+  // then the map centre.
+  const anchorFrom = (cells: RuntimeCell[]): RuntimeCell | null => {
+    if (cells.length === 0) return null;
+    const minRow = Math.min(...cells.map((c) => c.row));
+    const top = cells.filter((c) => c.row === minRow);
+    const avgCol = Math.round(top.reduce((s, c) => s + c.col, 0) / top.length);
+    return { col: avgCol, row: minRow };
+  };
+  const finish: RuntimeCell =
+    anchorFrom(flagCells) ??
+    anchorFrom(finishGroundCells) ?? { col: Math.floor(cols / 2), row: 1 };
 
   const spawn = deriveSpawn(gids, cols, rows, finish);
 

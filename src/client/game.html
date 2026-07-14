@@ -481,7 +481,7 @@
     <!-- Title -->
     <div id="game-title-text">
       <span class="t-sub">Hellish</span>
-      <span class="t-main">Golf</span>
+      <span class="t-main">Golf <span id="infuriating-badge" style="display:none">&#128293;</span></span>
     </div>
 
     <!-- HUD (right side) -->
@@ -564,6 +564,13 @@
             <span class="setting-label">Sound</span>
             <button class="modal-button" id="settings-sound" style="width: auto; margin: 0; padding: 8px 18px">On</button>
           </div>
+          <div class="setting-row">
+            <span class="setting-label">
+              Infuriating Mode &#128293;
+              <span style="display:block;font-size:11px;font-weight:500;opacity:0.75">Checkpoints disabled</span>
+            </span>
+            <button class="modal-button warning" id="settings-infuriating" style="width: auto; margin: 0; padding: 8px 18px">Off</button>
+          </div>
         </div>
       </div>
     </div>
@@ -589,6 +596,10 @@
           <div class="modal-sub">strokes</div>
           <div class="modal-row"><span>Time</span><span id="result-time">&mdash;</span></div>
           <div class="modal-row"><span>Rank</span><span id="result-rank">&mdash;</span></div>
+          <div style="text-align:center;margin-top:14px;color:#7b3518">
+            <span style="display:block;font-size:12px;opacity:0.7">New hole in</span>
+            <span id="result-countdown" style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:0.05em">--:--:--</span>
+          </div>
           <button class="modal-button" id="btn-retry">Play Again</button>
           <button class="modal-button secondary" id="btn-result-leaderboard">Leaderboard</button>
         </div>
