@@ -26,6 +26,9 @@ export interface TiledMapJson {
     width?: number;
     height?: number;
   }>;
+  metadata?: {
+    checkpointOrder?: Array<{ x: number; y: number }>;
+  };
 }
 
 export interface RuntimeCell {
@@ -46,6 +49,8 @@ export interface RuntimeMap {
   spawn: RuntimeCell;
   /** Checkpoint flag cells. */
   checkpoints: RuntimeCell[];
+  /** Checkpoint flags in climb/progression order, lowest/earliest first. */
+  checkpointOrder: RuntimeCell[];
 }
 
 function gidAt(gids: number[], cols: number, col: number, row: number): number {
@@ -97,6 +102,7 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
     anchorFrom(finishGroundCells) ?? { col: Math.floor(cols / 2), row: 1 };
 
   const spawn = deriveSpawn(gids, cols, rows, finish);
+  const checkpointOrder = deriveCheckpointOrder(json, checkpoints);
 
   return {
     cols,
@@ -107,7 +113,24 @@ export function parseTiledMap(json: TiledMapJson): RuntimeMap {
     finish,
     spawn,
     checkpoints,
+    checkpointOrder,
   };
+}
+
+function deriveCheckpointOrder(
+  json: TiledMapJson,
+  checkpoints: RuntimeCell[]
+): RuntimeCell[] {
+  const order = json.metadata?.checkpointOrder;
+  if (Array.isArray(order) && order.length > 0) {
+    return order
+      .filter((c) => Number.isFinite(c.x) && Number.isFinite(c.y))
+      .map((c) => ({ col: c.x, row: c.y }));
+  }
+
+  // Older mirrored maps do not carry metadata. They climb toward the top, so
+  // lower rows are earlier checkpoints and smaller rows are later progress.
+  return [...checkpoints].sort((a, b) => b.row - a.row || a.col - b.col);
 }
 
 /**

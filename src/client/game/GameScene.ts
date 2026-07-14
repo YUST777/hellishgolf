@@ -43,7 +43,13 @@ type CheckpointZone = {
   row: number;
   startCol: number;
   endCol: number;
+  rank: number;
   respawn: Phaser.Math.Vector2;
+};
+
+type CheckpointFlagMarker = {
+  sprite: Phaser.GameObjects.Image;
+  rank: number;
 };
 
 /**
@@ -84,9 +90,10 @@ export class GameScene extends Phaser.Scene {
   private waterRects: Phaser.Geom.Rectangle[] = [];
   private roughRects: Phaser.Geom.Rectangle[] = [];
   private checkpointZones: CheckpointZone[] = [];
-  private activatedCheckpointKeys = new Set<string>();
+  private activatedCheckpointRanks = new Set<number>();
+  private bestCheckpointRank = -1;
   /** Checkpoint flags are visual only; activation comes from the ground. */
-  private checkpointFlagSprites: Phaser.GameObjects.Image[] = [];
+  private checkpointFlagMarkers: CheckpointFlagMarker[] = [];
   /** True once a shot has been taken since the last spawn/respawn. */
   private shotSinceReset = false;
   private finishZone!: Phaser.Geom.Rectangle;
@@ -138,8 +145,9 @@ export class GameScene extends Phaser.Scene {
     this.waterRects = [];
     this.roughRects = [];
     this.checkpointZones = [];
-    this.activatedCheckpointKeys = new Set();
-    this.checkpointFlagSprites = [];
+    this.activatedCheckpointRanks = new Set();
+    this.bestCheckpointRank = -1;
+    this.checkpointFlagMarkers = [];
     this.shotSinceReset = false;
     this.accumulator = 0;
     this.groundHandles = new Set();
@@ -342,7 +350,10 @@ export class GameScene extends Phaser.Scene {
         // Checkpoint flags stay visual-only; checkpoint activation comes from
         // landing on checkpoint-ground tiles.
         if (cleanGid(gid) - 1 === T_CHECKPOINT_FLAG) {
-          this.checkpointFlagSprites.push(img);
+          this.checkpointFlagMarkers.push({
+            sprite: img,
+            rank: this.checkpointRankForCell(col, row),
+          });
         }
       }
     }
@@ -474,13 +485,15 @@ export class GameScene extends Phaser.Scene {
           startCol * TILE + width / 2,
           row * TILE - TILE / 2
         );
+        const target = this.nearestCheckpointFlagTarget(zoneCenter.x, zoneCenter.y);
 
         zones.push({
           key: `${startCol}-${endCol},${row}`,
           row,
           startCol,
           endCol,
-          respawn: this.nearestCheckpointFlagPoint(zoneCenter.x, zoneCenter.y),
+          rank: target.rank,
+          respawn: target.point,
           rect: new Phaser.Geom.Rectangle(
             startCol * TILE - padX,
             row * TILE - topPad,
@@ -996,10 +1009,12 @@ export class GameScene extends Phaser.Scene {
       if (zone.row !== footRow) continue;
       if (maxFootCol < zone.startCol || minFootCol > zone.endCol) continue;
       if (!Phaser.Geom.Intersects.CircleToRectangle(ballCircle, zone.rect)) continue;
+      if (zone.rank < this.bestCheckpointRank) return;
 
       this.respawn.copy(zone.respawn);
-      if (!this.activatedCheckpointKeys.has(zone.key)) {
-        this.activatedCheckpointKeys.add(zone.key);
+      if (zone.rank > this.bestCheckpointRank) this.bestCheckpointRank = zone.rank;
+      if (!this.activatedCheckpointRanks.has(zone.rank)) {
+        this.activatedCheckpointRanks.add(zone.rank);
         sound.play('Chime', 0.5);
         this.onCheckpoint?.();
         this.game.events.emit('checkpoint-reached');
@@ -1023,7 +1038,7 @@ export class GameScene extends Phaser.Scene {
     });
     this.cameras.main.flash(160, 253, 223, 106);
     // Flash the flag bright, then leave it subtly lit.
-    const s = this.nearestCheckpointFlagSprite(x, y);
+    const s = this.nearestCheckpointFlagMarker(x, y)?.sprite ?? null;
     if (s) {
       const baseX = s.scaleX;
       const baseY = s.scaleY;
@@ -1043,25 +1058,43 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private nearestCheckpointFlagPoint(x: number, y: number): Phaser.Math.Vector2 {
-    const s = this.nearestCheckpointFlagSprite(x, y);
-    return s ? new Phaser.Math.Vector2(s.x, s.y) : new Phaser.Math.Vector2(x, y);
-  }
-
-  private nearestCheckpointFlagSprite(
+  private nearestCheckpointFlagTarget(
     x: number,
     y: number
-  ): Phaser.GameObjects.Image | null {
-    let best: Phaser.GameObjects.Image | null = null;
+  ): { point: Phaser.Math.Vector2; rank: number } {
+    const marker = this.nearestCheckpointFlagMarker(x, y);
+    if (!marker) return { point: new Phaser.Math.Vector2(x, y), rank: 0 };
+    return {
+      point: new Phaser.Math.Vector2(marker.sprite.x, marker.sprite.y),
+      rank: marker.rank,
+    };
+  }
+
+  private nearestCheckpointFlagMarker(
+    x: number,
+    y: number
+  ): CheckpointFlagMarker | null {
+    let best: CheckpointFlagMarker | null = null;
     let bestDist = Infinity;
-    for (const s of this.checkpointFlagSprites) {
-      const d = Phaser.Math.Distance.Squared(x, y, s.x, s.y);
+    for (const marker of this.checkpointFlagMarkers) {
+      const d = Phaser.Math.Distance.Squared(x, y, marker.sprite.x, marker.sprite.y);
       if (d < bestDist) {
         bestDist = d;
-        best = s;
+        best = marker;
       }
     }
     return best;
+  }
+
+  private checkpointRankForCell(col: number, row: number): number {
+    const orderedRank = this.map.checkpointOrder.findIndex(
+      (c) => c.col === col && c.row === row
+    );
+    if (orderedRank >= 0) return orderedRank;
+    const discoveredRank = this.map.checkpoints.findIndex(
+      (c) => c.col === col && c.row === row
+    );
+    return discoveredRank >= 0 ? discoveredRank : 0;
   }
 
   /**
