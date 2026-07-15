@@ -24,6 +24,10 @@
   },
   "permissions": {
     "redis": true,
+    "http": {
+      "enable": true,
+      "domains": ["golf-beryl-tau.vercel.app"]
+    },
     "reddit": {
       "enable": true,
       "asUser": ["SUBMIT_POST", "SUBMIT_COMMENT"]
@@ -31,6 +35,17 @@
   },
   "settings": {
     "global": {
+      "DB_BRIDGE_URL": {
+        "type": "string",
+        "label": "Database bridge URL",
+        "helpText": "Server-only HTTPS endpoint used when hosted runtimes cannot open Postgres sockets."
+      },
+      "DB_BRIDGE_TOKEN": {
+        "type": "string",
+        "label": "Database bridge token",
+        "helpText": "Shared secret used only between Devvit and the database bridge.",
+        "isSecret": true
+      },
       "DATABASE_URL": {
         "type": "string",
         "label": "Supabase DATABASE_URL",

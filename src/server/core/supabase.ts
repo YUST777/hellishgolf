@@ -28,6 +28,8 @@ let schemaReady: Promise<void> | null = null;
 let devvitSettings: Promise<DbValues> | null = null;
 
 const DB_KEYS = [
+  "DB_BRIDGE_URL",
+  "DB_BRIDGE_TOKEN",
   "DATABASE_URL",
   "DB_HOST",
   "DB_PORT",
@@ -39,6 +41,7 @@ const DB_KEYS = [
 
 type DbKey = (typeof DB_KEYS)[number];
 type DbValues = Partial<Record<DbKey, string>>;
+type BridgeConfig = { url: string; token: string };
 
 function clean(value: unknown): string | undefined {
   const text =
@@ -69,6 +72,50 @@ async function settingsValues(): Promise<DbValues> {
     })
     .catch(() => ({}));
   return devvitSettings;
+}
+
+function bridgeFrom(values: DbValues): BridgeConfig | null {
+  const url = values.DB_BRIDGE_URL;
+  const token = values.DB_BRIDGE_TOKEN;
+  if (!url || !token) return null;
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost") {
+    throw new Error("Database bridge must use HTTPS");
+  }
+  return { url: parsed.toString(), token };
+}
+
+async function bridgeConfig(): Promise<BridgeConfig | null> {
+  const local = bridgeFrom(processValues());
+  if (local) return local;
+  return bridgeFrom(await settingsValues());
+}
+
+async function callBridge<T>(
+  config: BridgeConfig,
+  action: string,
+  payload: Record<string, unknown>,
+): Promise<T> {
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${config.token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ action, ...payload }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = (await response.json().catch(() => null)) as {
+    ok?: boolean;
+    result?: T;
+    error?: string;
+  } | null;
+  if (!response.ok || !body?.ok) {
+    throw new Error(
+      body?.error ?? `Database bridge failed (${response.status})`,
+    );
+  }
+  return body.result as T;
 }
 
 function connectionString(values: DbValues): string | null {
@@ -130,7 +177,7 @@ async function sql(): Promise<postgres.Sql | null> {
 }
 
 export async function isSupabaseConfigured(): Promise<boolean> {
-  return (await connectionConfig()) !== null;
+  return (await bridgeConfig()) !== null || (await connectionConfig()) !== null;
 }
 
 async function createSchema(db: postgres.Sql): Promise<void> {
@@ -354,6 +401,14 @@ export async function getSupabaseBest(
   postId: string,
   accountId: string,
 ): Promise<number | null> {
+  const bridge = await bridgeConfig();
+  if (bridge) {
+    return callBridge<number | null>(bridge, "getBest", {
+      dateKey,
+      postId,
+      accountId,
+    });
+  }
   const db = await readySql();
   const rows = await db<BestRow[]>`
     SELECT strokes, time_ms
@@ -377,6 +432,10 @@ export async function submitSupabaseScore(params: {
   streak: number;
   moves: ReplayMove[];
 }): Promise<SubmitScoreResponse> {
+  const bridge = await bridgeConfig();
+  if (bridge) {
+    return callBridge<SubmitScoreResponse>(bridge, "submitScore", { params });
+  }
   const db = await readySql();
 
   return db.begin(async (tx) => {
@@ -506,6 +565,15 @@ export async function getSupabaseLeaderboard(params: {
   limit?: number;
 }): Promise<LeaderboardResponse> {
   const { dateKey, postId, accountId, limit = 10 } = params;
+  const bridge = await bridgeConfig();
+  if (bridge) {
+    return callBridge<LeaderboardResponse>(bridge, "getLeaderboard", {
+      dateKey,
+      postId,
+      accountId,
+      limit,
+    });
+  }
   const db = await readySql();
 
   const totalRows = await db<CountRow[]>`
@@ -580,6 +648,13 @@ export async function registerSupabasePlayer(
   username: string,
 ): Promise<boolean> {
   if (!(await isSupabaseConfigured())) return false;
+  const bridge = await bridgeConfig();
+  if (bridge) {
+    return callBridge<boolean>(bridge, "registerPlayer", {
+      accountId,
+      username,
+    });
+  }
   const db = await readySql();
   await db`
     INSERT INTO players (account_id, username)
