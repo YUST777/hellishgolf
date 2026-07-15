@@ -4,16 +4,17 @@
  * (no extra dependency) with the exact same mirrored audio files and the same
  * playback volumes pulled from the game bundle.
  *
- * Sound map (bundle `On` enum -> file, in public/game/audio/):
- *   BallHit    impactPlate_light_003   (shot / club hit)
- *   BallBounce footstep_wood_003       (wall/ground bounce)
- *   Splash     rock_splash             (water hazard)
- *   Chime      loading_chime           (level ready)
- *   Claps      slowclap                (finish)
- *   Back       click_002               (ui)
- *   Leaves     leaves                  (rough)
- *   Squawk     squawk                  (bird)
- *   Ambient    ambient_birds           (background loop)
+ * Sound map (file in public/game/audio/):
+ *   BallHit    ball_hit      (shot / club hit)
+ *   BallBounce ball_bounce   (wall/ground bounce)
+ *   Splash     splash        (water hazard)
+ *   Chime      chime         (level ready)
+ *   Claps      applause      (finish)
+ *   Back       ui_click      (ui)
+ *   Leaves     leaves        (rough)
+ *   Squawk     squawk        (bird)
+ *   Ambient    ambient_birds (background loop)
+ *   LavaDrop   lava_drop     (lava hazard)
  */
 
 const BASE = "game/audio";
@@ -32,16 +33,16 @@ export type Sfx =
   | "LavaDrop";
 
 const FILES: Record<Sfx, string> = {
-  BallHit: "impactPlate_light_003",
-  BallBounce: "footstep_wood_003",
-  Splash: "rock_splash",
-  Chime: "loading_chime",
-  Claps: "slowclap",
-  Back: "click_002",
+  BallHit: "ball_hit",
+  BallBounce: "ball_bounce",
+  Splash: "splash",
+  Chime: "chime",
+  Claps: "applause",
+  Back: "ui_click",
   Leaves: "leaves",
   Squawk: "squawk",
   Ambient: "ambient_birds",
-  LavaDrop: "golf_drop_lava",
+  LavaDrop: "lava_drop",
 };
 
 /** Sounds that only ship as .mp3 (no .ogg variant). */
