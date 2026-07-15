@@ -591,6 +591,9 @@ function showQuickGuide(force = false) {
 
   hide("menu-overlay");
   el<HTMLElement>("quick-guide").hidden = false;
+  window.requestAnimationFrame(() =>
+    el<HTMLButtonElement>("quick-guide-done").focus(),
+  );
 }
 
 function retry() {
@@ -705,7 +708,6 @@ function wireUi() {
     openLeaderboard();
   });
   el("menu-tutorial").addEventListener("click", () => showQuickGuide(true));
-  el("quick-guide-close").addEventListener("click", dismissQuickGuide);
   el("quick-guide-done").addEventListener("click", dismissQuickGuide);
   el("menu-settings").addEventListener("click", () => {
     hide("menu-overlay");

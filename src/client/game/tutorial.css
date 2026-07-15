@@ -1,270 +1,173 @@
 :root {
-  --guide-panel: rgba(35, 38, 42, 0.96);
-  --guide-panel-raised: #30343a;
-  --guide-border: rgba(226, 220, 210, 0.18);
-  --guide-text: #d6d2ca;
-  --guide-muted: #9b9da1;
-  --guide-title: #f3f0e9;
-  --guide-accent: #d5bb79;
+  --tutorial-paper: #f4e4b5;
+  --tutorial-paper-light: #fff1c9;
+  --tutorial-ink: #4a2c18;
+  --tutorial-copy: #873a20;
+  --tutorial-border: #8a6a32;
+  --tutorial-green: #237d5b;
+  --tutorial-green-dark: #0c513b;
 }
 
-.quick-guide {
+.tutorial-gate {
   position: fixed;
-  top: 88px;
-  right: 12px;
-  z-index: 42;
-  display: flex;
-  width: min(370px, calc(100vw - 24px));
-  max-height: calc(100dvh - 174px);
-  flex-direction: column;
-  color: var(--guide-text);
-  background: var(--guide-panel);
-  border: 1px solid var(--guide-border);
-  border-radius: 7px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
-  font-family: system-ui, sans-serif;
-  pointer-events: none;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  padding: 18px;
+  place-items: center;
+  background: rgba(27, 20, 18, 0.62);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+  touch-action: none;
 }
 
-.quick-guide[hidden] {
+.tutorial-gate[hidden] {
   display: none;
 }
 
-.quick-guide-header,
-.quick-guide-footer {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
+.tutorial-card {
+  width: min(760px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  padding: clamp(22px, 4vh, 40px) clamp(22px, 5vw, 54px) 30px;
+  overflow-y: auto;
+  color: var(--tutorial-ink);
+  background: var(--tutorial-paper);
+  border: 7px solid var(--tutorial-border);
+  border-radius: 22px;
+  box-shadow:
+    inset 0 0 0 5px var(--tutorial-paper-light),
+    0 18px 50px rgba(0, 0, 0, 0.48);
+  font-family: system-ui, sans-serif;
 }
 
-.quick-guide-header {
-  min-height: 58px;
-  justify-content: space-between;
-  padding: 10px 10px 10px 14px;
-  border-bottom: 1px solid var(--guide-border);
-}
-
-.quick-guide-kicker {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--guide-muted);
-  font-size: 9px;
-  font-weight: 800;
+.tutorial-card h2 {
+  margin: 0 0 clamp(20px, 3vh, 30px);
+  color: var(--tutorial-ink);
+  font-size: clamp(30px, 5vw, 46px);
+  font-weight: 950;
+  letter-spacing: 0;
   line-height: 1;
+  text-align: center;
   text-transform: uppercase;
 }
 
-.quick-guide h2 {
-  margin: 0;
-  color: var(--guide-title);
-  font-size: 18px;
-  font-weight: 850;
-  line-height: 1;
-}
-
-.quick-guide-control {
-  pointer-events: auto;
-}
-
-.quick-guide-close {
+.tutorial-steps {
   display: grid;
-  width: 34px;
-  height: 34px;
-  padding: 8px;
-  place-items: center;
-  color: #b9b7b1;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 5px;
+  gap: clamp(13px, 2vh, 20px);
 }
 
-.quick-guide-close:hover,
-.quick-guide-close:focus-visible {
-  color: var(--guide-title);
-  background: var(--guide-panel-raised);
-  border-color: var(--guide-border);
-}
-
-.quick-guide-scroll {
-  min-height: 0;
-  padding: 10px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-color: #666a70 transparent;
-  scrollbar-width: thin;
-}
-
-.quick-guide-scroll:focus-visible {
-  outline: 1px solid var(--guide-accent);
-  outline-offset: -3px;
-}
-
-.quick-guide-item {
+.tutorial-step {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 9px;
-  align-items: start;
-  padding: 8px;
-  border-bottom: 1px solid rgba(226, 220, 210, 0.1);
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
 }
 
-.quick-guide-item > svg {
-  width: 21px;
-  height: 21px;
-  margin-top: 1px;
-  color: var(--guide-accent);
+.tutorial-step > svg {
+  width: 48px;
+  height: 48px;
+  justify-self: center;
+  color: #315b66;
+  stroke-width: 1.8;
 }
 
-.quick-guide-item .quick-guide-coin {
+.tutorial-step > .tutorial-coin-icon {
   fill: none;
   stroke: currentColor;
 }
 
-.quick-guide p,
-.quick-guide-powerup span {
+.tutorial-step h3 {
+  margin: 0 0 4px;
+  color: var(--tutorial-ink);
+  font-size: clamp(18px, 2.4vw, 27px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+.tutorial-step p {
   margin: 0;
-  font-size: 11px;
+  color: var(--tutorial-copy);
+  font-size: clamp(14px, 1.8vw, 20px);
   font-weight: 600;
-  line-height: 1.42;
+  line-height: 1.32;
 }
 
-.quick-guide strong {
-  color: var(--guide-title);
-  font-weight: 800;
+.tutorial-done {
+  width: 100%;
+  min-height: 68px;
+  margin-top: clamp(22px, 3vh, 32px);
+  color: #fffdf5;
+  background: var(--tutorial-green);
+  border: 5px solid var(--tutorial-green-dark);
+  border-radius: 18px;
+  box-shadow: 0 8px 0 rgba(12, 81, 59, 0.24);
+  font-size: clamp(21px, 3vw, 28px);
+  font-weight: 950;
+  letter-spacing: 0;
 }
 
-.quick-guide-powerups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding: 9px 0 7px;
+.tutorial-done:hover,
+.tutorial-done:focus-visible {
+  background: #2c926b;
+  outline: 3px solid #fff7d9;
+  outline-offset: 2px;
 }
 
-.quick-guide-powerup {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 7px;
-  padding: 9px 8px;
-  color: var(--guide-text);
-  background: var(--guide-panel-raised);
-  border: 1px solid rgba(226, 220, 210, 0.11);
-  border-radius: 5px;
-}
-
-.quick-guide-powerup .ui-icon {
-  width: 21px;
-  height: 21px;
-  color: var(--guide-accent);
-}
-
-.quick-guide-powerup span {
-  font-size: 10px;
-  line-height: 1.35;
-}
-
-.quick-guide-endgame {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.quick-guide-endgame .quick-guide-item {
-  border-bottom: 0;
-}
-
-.quick-guide-endgame .quick-guide-item + .quick-guide-item {
-  border-left: 1px solid rgba(226, 220, 210, 0.1);
-}
-
-.quick-guide-footer {
-  gap: 10px;
-  justify-content: space-between;
-  min-height: 50px;
-  padding: 8px 10px 8px 14px;
-  border-top: 1px solid var(--guide-border);
-}
-
-.quick-guide-footer span {
-  max-width: 220px;
-  color: var(--guide-muted);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-#quick-guide-done {
-  min-width: 72px;
-  height: 34px;
-  padding: 0 12px;
-  color: #1d1f22;
-  background: var(--guide-accent);
-  border: 1px solid #e4ce92;
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 850;
-}
-
-#quick-guide-done:hover,
-#quick-guide-done:focus-visible {
-  background: #e1ca8e;
+.tutorial-done:active {
+  transform: translateY(3px);
+  box-shadow: 0 4px 0 rgba(12, 81, 59, 0.24);
 }
 
 @media (max-width: 600px) {
-  .quick-guide {
-    top: auto;
-    right: 8px;
-    bottom: calc(76px + env(safe-area-inset-bottom));
+  .tutorial-gate {
+    padding: 8px;
+  }
+
+  .tutorial-card {
     width: calc(100vw - 16px);
-    max-height: min(38dvh, 322px);
+    max-height: calc(100dvh - 16px);
+    padding: 22px 18px 20px;
+    border-width: 5px;
+    border-radius: 18px;
+    box-shadow:
+      inset 0 0 0 3px var(--tutorial-paper-light),
+      0 14px 36px rgba(0, 0, 0, 0.5);
   }
 
-  .quick-guide-header {
-    min-height: 50px;
-    padding-block: 7px;
+  .tutorial-card h2 {
+    margin-bottom: 20px;
+    font-size: 29px;
   }
 
-  .quick-guide h2 {
-    font-size: 16px;
+  .tutorial-steps {
+    gap: 13px;
   }
 
-  .quick-guide-scroll {
-    padding: 7px 9px;
+  .tutorial-step {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 12px;
   }
 
-  .quick-guide-item {
-    gap: 7px;
-    padding: 5px 6px;
+  .tutorial-step > svg {
+    width: 36px;
+    height: 36px;
   }
 
-  .quick-guide-powerups {
-    padding-block: 5px;
+  .tutorial-step h3 {
+    margin-bottom: 2px;
+    font-size: 17px;
   }
 
-  .quick-guide-powerup {
-    gap: 5px;
-    padding: 6px;
+  .tutorial-step p {
+    font-size: 13px;
   }
 
-  .quick-guide p,
-  .quick-guide-powerup span {
-    font-size: 9px;
-    line-height: 1.35;
-  }
-
-  .quick-guide-footer {
-    min-height: 46px;
-    padding-block: 6px;
-  }
-}
-
-@media (max-width: 370px) {
-  .quick-guide-powerups {
-    grid-template-columns: 1fr;
-  }
-
-  .quick-guide-powerup {
-    display: grid;
-    grid-template-columns: 21px minmax(0, 1fr);
-    align-items: center;
+  .tutorial-done {
+    min-height: 58px;
+    margin-top: 20px;
+    border-width: 4px;
+    border-radius: 14px;
+    font-size: 21px;
   }
 }

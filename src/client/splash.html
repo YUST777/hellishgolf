@@ -7,182 +7,299 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>Hellish Golf</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2324272b'/%3E%3Ccircle cx='30' cy='34' r='15' fill='%23f7f7f0'/%3E%3Cpath d='M19 26h22' stroke='%23d8b56d' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E"
+    <meta
+      name="description"
+      content="Hellish Golf is a daily vertical golf challenge for Reddit."
     />
+    <meta property="og:title" content="Hellish Golf" />
+    <meta
+      property="og:description"
+      content="Climb today's course, collect coins, and finish in the fewest strokes."
+    />
+    <meta property="og:image" content="game/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="game/logo.jpg" />
+    <link rel="icon" type="image/jpeg" href="game/logo.jpg" />
+    <link rel="apple-touch-icon" href="game/logo.jpg" />
     <style>
       * {
         box-sizing: border-box;
         -webkit-tap-highlight-color: transparent;
       }
+
       html,
       body {
-        margin: 0;
-        padding: 0;
         width: 100%;
         height: 100%;
+        margin: 0;
         overflow: hidden;
-        user-select: none;
-        font-family:
-          system-ui,
-          -apple-system,
-          "Segoe UI",
-          sans-serif;
-        background: linear-gradient(to bottom right, #15171a, #2d333a);
         color: #fff;
+        background: #180704;
+        font-family: system-ui, sans-serif;
       }
-      .splash {
+
+      .game-preview {
         position: fixed;
         inset: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 1.5rem;
-        background:
-          radial-gradient(
-            circle at 50% 38%,
-            rgba(216, 181, 109, 0.12),
-            transparent 19rem
-          ),
-          linear-gradient(to bottom right, #15171a, #2d333a);
+        isolation: isolate;
+        overflow: hidden;
+        background: #180704;
       }
-      .title {
-        line-height: 0.95;
-        margin-bottom: 0.5rem;
-      }
-      .title .top {
-        font-size: 42px;
-        font-weight: 800;
-        display: block;
-      }
-      .title .bottom {
-        font-size: 84px;
-        font-weight: 800;
-        color: #d8b56d;
-        display: block;
-      }
-      .sub {
-        font-size: 15px;
-        color: #d9d1c5;
-        opacity: 0.95;
-        margin: 0 0 1.5rem;
-        max-width: 22rem;
-      }
-      .badge {
-        display: inline-flex;
-        gap: 10px;
-        align-items: center;
-        border: 2px solid #4b5563;
-        background: #24272b;
-        color: #f4efe6;
-        border-radius: 10px;
-        padding: 8px 14px;
-        margin-bottom: 1.25rem;
-        font-weight: 700;
-        box-shadow:
-          0 10px 24px rgba(0, 0, 0, 0.2),
-          inset 0 1px rgba(255, 255, 255, 0.08);
-      }
-      .badge svg {
-        width: 18px;
-        height: 18px;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 2.4;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-      }
-      .badge-main {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-      }
-      .badge .n {
-        color: #b7b0a4;
-        font-size: 12px;
-        font-weight: 500;
-        display: block;
-      }
-      .play {
-        font-size: 18px;
-        font-weight: 800;
-        color: #fff;
-        cursor: pointer;
-        background: #047857;
-        border: 2px solid #034d34;
-        border-radius: 12px;
-        padding: 14px 28px;
-        box-shadow:
-          0 4px 0 #034d34,
-          0 6px 8px rgba(0, 0, 0, 0.25);
-        transition:
-          transform 0.1s,
-          box-shadow 0.1s;
-      }
-      .play:active {
-        transform: translateY(3px);
-        box-shadow: 0 1px 0 #034d34;
-      }
-      .hill {
+
+      #preview-canvas {
         position: absolute;
-        bottom: 0;
-        left: 0;
+        inset: 0;
         width: 100%;
-        height: 120px;
-        z-index: -1;
+        height: 100%;
+        image-rendering: pixelated;
       }
-      .foot {
+
+      .preview-shade {
         position: absolute;
-        bottom: 10px;
-        color: #b7b0a4;
+        inset: 0;
+        z-index: 1;
+        background:
+          linear-gradient(to bottom, rgba(0, 0, 0, 0.32), transparent 25%),
+          linear-gradient(to top, rgba(0, 0, 0, 0.58), transparent 42%),
+          radial-gradient(
+            circle at 50% 48%,
+            transparent 42%,
+            rgba(0, 0, 0, 0.24)
+          );
+        pointer-events: none;
+      }
+
+      .preview-topbar {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        left: 12px;
+        z-index: 2;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        pointer-events: none;
+      }
+
+      .preview-brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+        padding: 6px 10px 6px 6px;
+        background: rgba(18, 18, 18, 0.8);
+        border: 1px solid rgba(255, 128, 46, 0.42);
+        border-radius: 7px;
+        box-shadow: 0 5px 16px rgba(0, 0, 0, 0.35);
+      }
+
+      .preview-brand img {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        object-fit: cover;
+        border-radius: 5px;
+      }
+
+      .preview-brand-text {
+        min-width: 0;
+      }
+
+      .preview-brand strong,
+      .preview-brand span {
+        display: block;
+        white-space: nowrap;
+      }
+
+      .preview-brand strong {
+        font-size: 16px;
+        line-height: 1.05;
+      }
+
+      .preview-brand span {
+        margin-top: 3px;
+        color: #e4b176;
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .preview-hud {
+        display: flex;
+        gap: 6px;
+      }
+
+      .preview-pill {
+        min-width: 67px;
+        padding: 7px 9px;
+        color: #eee8df;
+        background: rgba(18, 18, 18, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 7px;
+        box-shadow: 0 5px 16px rgba(0, 0, 0, 0.35);
+        text-align: center;
+      }
+
+      .preview-pill span,
+      .preview-pill strong {
+        display: block;
+      }
+
+      .preview-pill span {
+        color: #a9a29a;
+        font-size: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .preview-pill strong {
+        margin-top: 2px;
+        font-size: 14px;
+      }
+
+      .preview-launch {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        z-index: 3;
+        display: inline-flex;
+        min-height: 52px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 22px;
+        color: #fff8ec;
+        background: #a43616;
+        border: 2px solid #f3782d;
+        border-radius: 7px;
+        box-shadow:
+          0 5px 0 #591708,
+          0 10px 24px rgba(0, 0, 0, 0.42);
+        font-size: 15px;
+        font-weight: 900;
+        letter-spacing: 0;
+        cursor: pointer;
+      }
+
+      .preview-launch svg {
+        width: 20px;
+        height: 20px;
+        fill: currentColor;
+      }
+
+      .preview-launch:hover,
+      .preview-launch:focus-visible {
+        background: #c24920;
+        outline: 3px solid rgba(255, 235, 197, 0.88);
+        outline-offset: 3px;
+      }
+
+      .preview-launch:active {
+        transform: translateY(3px);
+        box-shadow:
+          0 2px 0 #591708,
+          0 6px 16px rgba(0, 0, 0, 0.42);
+      }
+
+      .preview-tip {
+        position: absolute;
+        bottom: 20px;
+        left: 18px;
+        z-index: 2;
+        max-width: calc(100% - 235px);
+        color: rgba(255, 244, 228, 0.8);
         font-size: 11px;
-        opacity: 0.75;
+        font-weight: 750;
+        text-shadow: 0 2px 6px #000;
+        pointer-events: none;
+      }
+
+      @media (max-width: 560px) {
+        .preview-topbar {
+          top: 8px;
+          right: 8px;
+          left: 8px;
+        }
+
+        .preview-brand {
+          padding: 5px 7px 5px 5px;
+        }
+
+        .preview-brand img {
+          width: 36px;
+          height: 36px;
+          flex-basis: 36px;
+        }
+
+        .preview-brand strong {
+          font-size: 13px;
+        }
+
+        .preview-hud .preview-pill:nth-child(2) {
+          display: none;
+        }
+
+        .preview-pill {
+          min-width: 58px;
+          padding: 6px 7px;
+        }
+
+        .preview-launch {
+          right: 10px;
+          bottom: 10px;
+          min-height: 48px;
+          padding: 0 17px;
+          font-size: 13px;
+        }
+
+        .preview-tip {
+          bottom: 68px;
+          left: 12px;
+          max-width: calc(100% - 24px);
+          font-size: 10px;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="splash">
-      <div class="title">
-        <span class="top">Peak</span>
-        <span class="bottom">Putt</span>
+    <main class="game-preview" id="game-preview">
+      <canvas id="preview-canvas" aria-hidden="true"></canvas>
+      <div class="preview-shade"></div>
+
+      <div class="preview-topbar">
+        <div class="preview-brand">
+          <img src="game/logo.jpg" alt="" />
+          <div class="preview-brand-text">
+            <strong>Hellish Golf</strong>
+            <span id="preview-day">Loading daily hole</span>
+          </div>
+        </div>
+        <div class="preview-hud">
+          <div class="preview-pill">
+            <span>Hole</span>
+            <strong id="preview-hole">--</strong>
+          </div>
+          <div class="preview-pill">
+            <span>Best</span>
+            <strong id="preview-best">-</strong>
+          </div>
+          <div class="preview-pill">
+            <span>Strokes</span>
+            <strong>0</strong>
+          </div>
+        </div>
       </div>
-      <p class="sub">
-        A daily climb-the-hole golf game. Aim, launch, and reach the summit in
-        as few strokes as you can.
-      </p>
-      <div class="badge">
-        <span class="badge-main">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M7 21V4" />
-            <path d="M8 5h10l-2.2 3L18 11H8" />
-            <path d="M5 21h6" />
-          </svg>
-          Daily Hole
-        </span>
-        <span class="n">New hole every day</span>
+
+      <div class="preview-tip">
+        Drag opposite your target. Release to launch.
       </div>
-      <button class="play" id="play">Play today's hole</button>
-      <svg class="hill" viewBox="0 0 1000 200" preserveAspectRatio="none">
-        <path
-          d="M0 150 Q 250 120 500 130 Q 750 180 1000 100 V 200 H 0 Z"
-          fill="#3f4a42"
-        />
-      </svg>
-      <div class="foot">Hellish Golf · built on Devvit + Phaser</div>
-    </div>
-    <script>
-      // The splash is the inline post preview. Tapping play navigates the post
-      // to the interactive "game" entrypoint (a full webview).
-      document.getElementById("play").addEventListener("click", function () {
-        // Devvit renders the "game" entrypoint when the post is opened; this
-        // button is a visual affordance. If a navigation bridge exists, use it.
-        if (window.parent) {
-          window.parent.postMessage({ type: "peakputt:play" }, "*");
-        }
-      });
-    </script>
+      <button class="preview-launch" id="play" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        Play today's hole
+      </button>
+    </main>
+    <script type="module" src="./splash.ts"></script>
   </body>
 </html>

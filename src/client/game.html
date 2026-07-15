@@ -7,10 +7,20 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>Hellish Golf</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2324272b'/%3E%3Ccircle cx='30' cy='34' r='15' fill='%23f7f7f0'/%3E%3Cpath d='M19 26h22' stroke='%23d8b56d' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E"
+    <meta
+      name="description"
+      content="Hellish Golf is a daily vertical golf challenge for Reddit."
     />
+    <meta property="og:title" content="Hellish Golf" />
+    <meta
+      property="og:description"
+      content="Climb today's course, collect coins, and finish in the fewest strokes."
+    />
+    <meta property="og:image" content="game/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="game/logo.jpg" />
+    <link rel="icon" type="image/jpeg" href="game/logo.jpg" />
+    <link rel="apple-touch-icon" href="game/logo.jpg" />
     <style>
       * {
         box-sizing: border-box;
@@ -1393,105 +1403,68 @@
 
     <div id="toast"></div>
 
-    <aside
+    <div
       id="quick-guide"
-      class="quick-guide"
+      class="tutorial-gate"
+      role="dialog"
+      aria-modal="true"
       aria-labelledby="quick-guide-title"
       hidden
     >
-      <div class="quick-guide-header">
-        <div>
-          <span class="quick-guide-kicker">First round</span>
-          <h2 id="quick-guide-title">Quick Guide</h2>
-        </div>
-        <button
-          id="quick-guide-close"
-          class="quick-guide-control quick-guide-close"
-          title="Close guide"
-          aria-label="Close guide"
-        >
-          <svg class="ui-icon" aria-hidden="true">
-            <use href="#icon-close"></use>
-          </svg>
-        </button>
-      </div>
-
-      <div class="quick-guide-scroll" tabindex="0">
-        <section class="quick-guide-item quick-guide-item-wide">
-          <svg class="ui-icon" aria-hidden="true">
-            <use href="#icon-trajectory"></use>
-          </svg>
-          <p>
-            <strong>Shoot.</strong> Press the ball, drag opposite your target,
-            then release. A longer pull hits harder. Lowest strokes wins; time
-            breaks ties.
-          </p>
-        </section>
-
-        <section class="quick-guide-item quick-guide-item-wide">
-          <svg class="quick-guide-coin" aria-hidden="true">
-            <use href="#icon-coin"></use>
-          </svg>
-          <p>
-            <strong>Collect and spend.</strong> Grab each daily-map coin once.
-            The Shop sells power-ups and cosmetic ball skins. Every account
-            starts with 3 of each power-up.
-          </p>
-        </section>
-
-        <div class="quick-guide-powerups" aria-label="Power-up effects">
-          <div class="quick-guide-powerup">
+      <section class="tutorial-card">
+        <h2 id="quick-guide-title">How to Play</h2>
+        <div class="tutorial-steps">
+          <div class="tutorial-step">
             <svg class="ui-icon" aria-hidden="true">
               <use href="#icon-trajectory"></use>
             </svg>
-            <span><strong>Trajectory</strong> previews one shot.</span>
+            <div>
+              <h3>Drag and Shoot</h3>
+              <p>Drag opposite your target, then release to shoot.</p>
+            </div>
           </div>
-          <div class="quick-guide-powerup">
-            <svg class="ui-icon filled" aria-hidden="true">
-              <use href="#icon-sticky"></use>
-            </svg>
-            <span><strong>Sticky Slime</strong> coats a chosen wall.</span>
-          </div>
-          <div class="quick-guide-powerup">
-            <svg class="ui-icon" aria-hidden="true">
-              <use href="#icon-checkpoint"></use>
-            </svg>
-            <span
-              ><strong>Checkpoint</strong> makes a grounded return flag.</span
-            >
-          </div>
-        </div>
-
-        <div class="quick-guide-endgame">
-          <section class="quick-guide-item">
-            <svg class="ui-icon" aria-hidden="true">
-              <use href="#icon-checkpoint"></use>
-            </svg>
-            <p>
-              <strong>Checkpoints.</strong> Land on the ground. Flags are
-              non-solid, and lower checkpoints never replace higher progress.
-            </p>
-          </section>
-
-          <section class="quick-guide-item">
+          <div class="tutorial-step">
             <svg class="ui-icon" aria-hidden="true">
               <use href="#icon-finish"></use>
             </svg>
-            <p>
-              <strong>Win.</strong> Land and stop on the finish platform to
-              submit your score and replay.
-            </p>
-          </section>
+            <div>
+              <h3>Climb to the Top</h3>
+              <p>Reach the finish using the fewest strokes.</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <svg class="ui-icon" aria-hidden="true">
+              <use href="#icon-checkpoint"></use>
+            </svg>
+            <div>
+              <h3>Use Checkpoints</h3>
+              <p>Land on checkpoint ground to save your progress.</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <svg class="tutorial-coin-icon" aria-hidden="true">
+              <use href="#icon-coin"></use>
+            </svg>
+            <div>
+              <h3>Collect Coins</h3>
+              <p>Find daily coins and spend them in the Shop.</p>
+            </div>
+          </div>
+          <div class="tutorial-step">
+            <svg class="ui-icon" aria-hidden="true">
+              <use href="#icon-shop"></use>
+            </svg>
+            <div>
+              <h3>Skins and Power-Ups</h3>
+              <p>
+                Buy skins, aim previews, sticky slime, and extra checkpoints.
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div class="quick-guide-footer">
-        <span>Shooting stays active while this guide is open.</span>
-        <button id="quick-guide-done" class="quick-guide-control">
-          Got it
-        </button>
-      </div>
-    </aside>
+        <button id="quick-guide-done" class="tutorial-done">Got it!</button>
+      </section>
+    </div>
 
     <!-- Menu modal -->
     <div class="overlay hidden" id="menu-overlay">

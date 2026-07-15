@@ -10,7 +10,7 @@ Players launch a golf ball through a difficult climbing course, collect coins, b
 - A scheduled daily task can create a fresh hole each day.
 - Scores are tied to the current Reddit username.
 - Every Reddit account starts with three of each powerup.
-- A first-run quick guide explains shooting, coins, the shop, skins, checkpoints, and the finish without blocking play.
+- A first-run How to Play card explains shooting, coins, the shop, skins, powerups, checkpoints, and the finish before play begins.
 - Account wallets, purchases, collected coins, equipped skins, and tutorial completion persist in Devvit Redis.
 - Leaderboards use Redis by default and Supabase when configured.
 - Replays are stored in the usermoves table when Supabase is available.
