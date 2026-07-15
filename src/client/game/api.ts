@@ -57,10 +57,12 @@ function dailyMapId(dateKey: string): {
   holeNumber: number;
   seed: number;
 } {
-  const epoch = Date.UTC(2025, 0, 1);
+  // Must match LAUNCH_DATE_UTC in src/server/core/daily.ts so Day #1 is the
+  // game's launch day everywhere.
+  const epoch = Date.UTC(2026, 6, 15);
   const day = Math.floor((Date.parse(dateKey) - epoch) / 86_400_000);
   const seed = seedFromDateKey(dateKey);
-  return { mapId: pickMapId(seed), holeNumber: day + 1, seed };
+  return { mapId: pickMapId(seed), holeNumber: Math.max(1, day + 1), seed };
 }
 
 function offlineBest(dateKey: string): number | null {

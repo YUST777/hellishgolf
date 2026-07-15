@@ -4,7 +4,7 @@ import { MAP_IDS, pickMapId } from "../../shared/mapManifest";
 import { redis } from "@devvit/web/server";
 
 /** Launch date used to compute sequential hole numbers. */
-const LAUNCH_DATE_UTC = Date.UTC(2026, 6, 1); // 2026-07-01
+const LAUNCH_DATE_UTC = Date.UTC(2026, 6, 15); // 2026-07-15 — Day #1
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const VALID_MAP_IDS = new Set<number>(MAP_IDS);
 

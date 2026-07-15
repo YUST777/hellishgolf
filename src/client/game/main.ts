@@ -11,6 +11,7 @@ import {
   ZOOM_STORAGE_KEY,
 } from "./config";
 import { apiClient } from "./api";
+import { setupInlineMode } from "./inlineMode";
 import { ensureRapier } from "./physics";
 import { sound } from "./sound";
 import { mapUrl } from "../../shared/mapManifest";
@@ -152,9 +153,7 @@ function updatePowerupHud() {
       `.powerup-btn[data-powerup="${kind}"]`,
     );
     const countNode = document.getElementById(`powerup-${kind}-count`);
-    const actionNode = document.getElementById(`powerup-${kind}-action`);
     if (countNode) countNode.textContent = `x${count}`;
-    if (actionNode) actionNode.textContent = isActive ? "READY" : "USE";
     if (button) {
       button.hidden = !showQuickUse;
       button.classList.toggle("can-use", canUse);
@@ -162,7 +161,7 @@ function updatePowerupHud() {
       button.classList.toggle("active", isActive);
       button.disabled = !canUse && !isActive;
       button.title = isActive
-        ? `${POWERUP_NAMES[kind]} ready`
+        ? `${POWERUP_NAMES[kind]} armed — click to cancel`
         : canUse
           ? `Use ${POWERUP_NAMES[kind]}`
           : `No ${POWERUP_NAMES[kind]} owned`;
@@ -194,7 +193,13 @@ async function onCoinCollected(coinId: string) {
 }
 
 function requestPowerup(kind: PowerupKind) {
-  if (activePowerup && activePowerup !== kind) {
+  // Click-to-toggle: clicking the active powerup disarms it.
+  if (activePowerup === kind) {
+    game?.events.emit("powerup-cancel");
+    setActivePowerup(null);
+    return;
+  }
+  if (activePowerup) {
     game?.events.emit("powerup-cancel");
     setActivePowerup(null);
   }
@@ -438,7 +443,6 @@ function startGame(data: InitResponse, map: RuntimeMap) {
         });
         // Tiling checkerboard backdrop (mirrors the original's background).
         this.load.image("checkerboard", "game/textures/checkerboard.webp");
-        this.load.image("coin", "game/textures/coin.png");
       }
       create() {
         this.scene.add("game", GameScene, true, sceneData());
@@ -839,6 +843,7 @@ function wireGameEvents() {
 }
 
 async function main() {
+  const inline = setupInlineMode();
   wireUi();
   try {
     // Load the Rapier engine (WASM) and the hole data in parallel.
@@ -861,7 +866,8 @@ async function main() {
     startGame(data, map);
     wireGameEvents();
     void loadLeaderboard();
-    window.setTimeout(() => showQuickGuide(), 650);
+    // Don't interrupt the inline feed preview with the tutorial dialog.
+    if (!inline) window.setTimeout(() => showQuickGuide(), 650);
   } catch (err) {
     console.error("init failed", err);
     bootPreview()?.fail?.("Failed to load hole. Refresh to retry.");
