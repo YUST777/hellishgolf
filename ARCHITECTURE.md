@@ -11,7 +11,7 @@ vercel.json          Static hosting + /api/game-db bridge deployment
 api/game-db.ts       Vercel serverless function: HTTPS bridge to Supabase Postgres
 supabase/            SQL schema for players / scores / usermoves tables
 public/game/         Static runtime assets (audio, cursors, textures, tilemaps)
-tools/               Dev-only scripts (local preview server, asset generators)
+tools/               Dev-only scripts (local preview server)
 ```
 
 ## Client (`src/client`)
