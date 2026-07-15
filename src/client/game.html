@@ -59,20 +59,41 @@
         touch-action: none;
       }
 
+      body.booting > :not(#boot-preview):not(script) {
+        visibility: hidden;
+        pointer-events: none !important;
+      }
+
       /* Loading ------------------------------------------------------------*/
-      #loading {
+      #boot-preview {
         position: fixed;
         inset: 0;
-        z-index: 30;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(to bottom right, #1a0603, #8a2410);
-        font-size: 16px;
-        font-weight: 700;
+        z-index: 3000;
+        overflow: hidden;
+        background: #160604;
+        transition: opacity 180ms ease;
       }
-      #loading.hidden {
-        display: none;
+      #boot-preview.is-ready {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #boot-preview-canvas {
+        width: 100%;
+        height: 100%;
+      }
+      #boot-preview-status {
+        position: absolute;
+        right: 12px;
+        bottom: 10px;
+        padding: 5px 8px;
+        color: rgba(244, 239, 230, 0.76);
+        background: rgba(17, 18, 20, 0.58);
+        border: 1px solid rgba(214, 205, 190, 0.14);
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        pointer-events: none;
       }
 
       /* Title + HUD --------------------------------------------------------*/
@@ -332,6 +353,8 @@
         width: 14px;
         height: 14px;
         flex: 0 0 14px;
+        object-fit: contain;
+        filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
       }
       .powerup-btn {
         position: relative;
@@ -925,17 +948,6 @@
       }
 
       /* Minimal ash theme --------------------------------------------------*/
-      #loading {
-        background:
-          radial-gradient(
-            circle at 50% 52%,
-            rgba(255, 190, 90, 0.12),
-            transparent 32rem
-          ),
-          linear-gradient(to bottom right, #111214, #24272b 58%, #161718);
-        color: #f4efe6;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-      }
       #game-title-text,
       .hud .pill,
       .icon-btn,
@@ -1174,7 +1186,7 @@
       }
     </style>
   </head>
-  <body>
+  <body class="booting">
     <svg class="svg-sprite" aria-hidden="true" focusable="false">
       <symbol id="icon-menu" viewBox="0 0 24 24">
         <path d="M4 7h16M4 12h16M4 17h16" />
@@ -1209,18 +1221,6 @@
           d="M12.4 22c-4.2 0-7.2-2.9-7.2-6.7 0-2.7 1.5-4.8 3.7-7 .5 1.7 1.4 2.7 2.5 3.2-.5-3.2.8-6.5 3.9-9.5.3 3.1 1.5 4.7 2.7 6.2 1.1 1.4 2.2 2.8 2.2 5.4 0 4.8-3.5 8.4-7.8 8.4Z"
         />
       </symbol>
-      <symbol id="icon-coin" viewBox="0 0 24 24">
-        <circle cx="12" cy="13" r="9" fill="#8a4b0f" stroke="none" />
-        <circle
-          cx="12"
-          cy="12"
-          r="8"
-          fill="#ffd65a"
-          stroke="#6b3a09"
-          stroke-width="1.6"
-        />
-        <circle cx="9" cy="9" r="2.2" fill="#fff1a6" stroke="none" />
-      </symbol>
       <symbol id="icon-finish" viewBox="0 0 24 24">
         <path d="M6 21V4" />
         <path d="M7 5h11v8H7" />
@@ -1228,9 +1228,13 @@
         <path d="M4 21h6" />
       </symbol>
     </svg>
+    <div id="boot-preview" aria-label="Loading today's Hellish Golf course">
+      <canvas id="boot-preview-canvas" aria-hidden="true"></canvas>
+      <span id="boot-preview-status" aria-live="polite"
+        >Loading today's hole</span
+      >
+    </div>
     <div id="game-root"></div>
-
-    <div id="loading">Descending into today's pit...</div>
 
     <!-- Title -->
     <div id="game-title-text">
@@ -1325,9 +1329,14 @@
 
     <div id="powerup-bar" aria-label="Powerups">
       <div id="coin-wallet" title="Coins">
-        <svg class="coin-icon" aria-hidden="true">
-          <use href="#icon-coin"></use>
-        </svg>
+        <img
+          class="coin-icon"
+          src="game/textures/coin.png"
+          width="128"
+          height="128"
+          alt=""
+          decoding="async"
+        />
         <span id="wallet-coins">0</span>
       </div>
       <button
@@ -1449,9 +1458,14 @@
             </div>
           </div>
           <div class="tutorial-step">
-            <svg class="tutorial-coin-icon" aria-hidden="true">
-              <use href="#icon-coin"></use>
-            </svg>
+            <img
+              class="tutorial-coin-icon"
+              src="game/textures/coin.png"
+              width="128"
+              height="128"
+              alt=""
+              decoding="async"
+            />
             <div>
               <h3>Collect Coins</h3>
               <p>Find daily coins and spend them in the Shop.</p>
@@ -1532,9 +1546,14 @@
           </button>
           <h2>Shop</h2>
           <div class="shop-wallet" title="Coins">
-            <svg class="coin-icon" aria-hidden="true">
-              <use href="#icon-coin"></use>
-            </svg>
+            <img
+              class="coin-icon"
+              src="game/textures/coin.png"
+              width="128"
+              height="128"
+              alt=""
+              decoding="async"
+            />
             <span id="shop-wallet-coins">0</span>
           </div>
           <div class="shop-tabs" role="tablist">
@@ -1843,6 +1862,7 @@
       </div>
     </div>
 
+    <script src="./game/boot-preview.js"></script>
     <script type="module" src="./game/main.ts"></script>
   </body>
 </html>

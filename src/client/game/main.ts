@@ -14,7 +14,11 @@ import { apiClient } from "./api";
 import { ensureRapier } from "./physics";
 import { sound } from "./sound";
 import { mapUrl } from "../../shared/mapManifest";
-import { parseTiledMap, type RuntimeMap } from "../../shared/tiled";
+import {
+  parseTiledMap,
+  type RuntimeMap,
+  type TiledMapJson,
+} from "../../shared/tiled";
 import { TILESET } from "../../shared/tiles";
 import type {
   InitResponse,
@@ -90,6 +94,18 @@ let accountBackedPlayer = false;
 let economyRequestPending = false;
 type ShopTab = "powerups" | "skins";
 let activeShopTab: ShopTab = "powerups";
+
+type BootPreviewBridge = {
+  initPromise?: Promise<InitResponse>;
+  mapPromise?: Promise<TiledMapJson>;
+  mapId?: number;
+  fail?: (message: string) => void;
+};
+
+function bootPreview(): BootPreviewBridge | undefined {
+  return (window as typeof window & { __hellishGolfBoot?: BootPreviewBridge })
+    .__hellishGolfBoot;
+}
 
 const POWERUP_DESCRIPTIONS: Record<PowerupKind, string> = {
   trajectory: "Aim preview for one shot.",
@@ -359,6 +375,10 @@ function grantTestCoins() {
 
 /** Load the raw Tiled JSON for a map id and parse it into the runtime model. */
 async function loadMap(mapId: number): Promise<RuntimeMap> {
+  const early = bootPreview();
+  if (early?.mapPromise && early.mapId === mapId) {
+    return parseTiledMap(await early.mapPromise);
+  }
   const res = await fetch(mapUrl(mapId));
   if (!res.ok) throw new Error(`Failed to load map ${mapId}: ${res.status}`);
   const json = await res.json();
@@ -390,8 +410,6 @@ function startGame(data: InitResponse, map: RuntimeMap) {
   init = data;
   runtimeMap = map;
 
-  el("loading").classList.add("hidden");
-
   setHud(0, data.bestToday, data.streak);
   updatePowerupHud();
   el("hole-number").textContent = `#${data.daily.holeNumber}`;
@@ -420,6 +438,7 @@ function startGame(data: InitResponse, map: RuntimeMap) {
         });
         // Tiling checkerboard backdrop (mirrors the original's background).
         this.load.image("checkerboard", "game/textures/checkerboard.webp");
+        this.load.image("coin", "game/textures/coin.png");
       }
       create() {
         this.scene.add("game", GameScene, true, sceneData());
@@ -823,7 +842,11 @@ async function main() {
   wireUi();
   try {
     // Load the Rapier engine (WASM) and the hole data in parallel.
-    const [data] = await Promise.all([apiClient.init(), ensureRapier()]);
+    const earlyInit = bootPreview()?.initPromise;
+    const [data] = await Promise.all([
+      earlyInit ?? apiClient.init(),
+      ensureRapier(),
+    ]);
     powerups = loadPowerupState(data.accountId);
     accountBackedPlayer = Boolean(
       data.player &&
@@ -841,7 +864,7 @@ async function main() {
     window.setTimeout(() => showQuickGuide(), 650);
   } catch (err) {
     console.error("init failed", err);
-    el("loading").textContent = "Failed to load hole. Refresh to retry.";
+    bootPreview()?.fail?.("Failed to load hole. Refresh to retry.");
   }
 }
 
