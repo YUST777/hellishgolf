@@ -18,7 +18,6 @@ import {
   BALL_VISUAL_RADIUS,
   COLORS,
   DEFAULT_ZOOM,
-  DIRT_FRAME,
   GRAVITY_Y,
   MAX_DRAG,
   MAX_LAUNCH_SPEED,
@@ -26,74 +25,38 @@ import {
   PIXELS_PER_METER,
   POWER_EXP,
   REST_SPEED,
-  SOURCE_TILE,
   TILE,
   ZOOM_LEVELS,
 } from "./config";
+import { buildColliders } from "./colliders";
+import { hashCell, pickCoinSpots } from "./coinSpots";
+import {
+  ballTextureKey,
+  drawSky,
+  ensureBallTexture,
+  ensureCoinTexture,
+  ensureGeneratedCheckpointTexture,
+} from "./sceneTextures";
+import type {
+  CheckpointFlagMarker,
+  CheckpointZone,
+  CoinPickup,
+  LaunchVector,
+  SlimePatch,
+} from "./sceneTypes";
+import { predictTrajectoryPoints, type TrajectoryEnv } from "./trajectory";
 import type { RuntimeMap } from "../../shared/tiled";
 import type { ReplayMove } from "../../shared/types";
 import {
   roleOfGid,
-  rampShapeOfId,
   cleanGid,
-  isCheckpointGroundId,
   isFlagId,
   T_CHECKPOINT_FLAG,
   TILESET,
-  type RampShape,
 } from "../../shared/tiles";
 import { sound } from "./sound";
 import { RAPIER } from "./physics";
-import {
-  MAX_COINS_PER_DAILY_MAP,
-  getBallSkin,
-  type BallSkinId,
-  type PowerupKind,
-} from "./powerups";
-
-type CheckpointZone = {
-  rect: Phaser.Geom.Rectangle;
-  key: string;
-  row: number;
-  startCol: number;
-  endCol: number;
-  rank: number;
-  respawn: Phaser.Math.Vector2;
-};
-
-type CheckpointFlagMarker = {
-  sprite: Phaser.GameObjects.Image;
-  rank: number;
-};
-
-type CoinPickup = {
-  id: string;
-  sprite: Phaser.GameObjects.Image;
-  x: number;
-  y: number;
-};
-
-type SlimePatch = {
-  circle: Phaser.Geom.Circle;
-  gfx: Phaser.GameObjects.Graphics;
-};
-
-type LaunchVector = {
-  raw: number;
-  power: number;
-  dir: Phaser.Math.Vector2;
-  velocityX: number;
-  velocityY: number;
-};
-
-type PredictionStop = "water" | "slime" | "bounds" | null;
-
-const TRAJECTORY_PREVIEW_SECONDS = 4.2;
-const TRAJECTORY_SAMPLE_STEPS = 9;
-const TRAJECTORY_SENSOR_STEPS = Math.max(
-  1,
-  Math.round(1 / 60 / PHYSICS_TIMESTEP),
-);
+import { getBallSkin, type BallSkinId, type PowerupKind } from "./powerups";
 
 /**
  * Renders a real Kinda Hard Golf Tiled map and runs the ball with the actual
@@ -289,9 +252,9 @@ export class GameScene extends Phaser.Scene {
     this.world.timestep = PHYSICS_TIMESTEP;
     this.eventQueue = new RAPIER.EventQueue(true);
 
-    this.drawSky();
+    drawSky(this, this.worldW, this.worldH);
     this.renderTiles();
-    this.buildColliders();
+    this.buildStaticGeometry();
     this.createBall();
     this.createCoins();
 
@@ -483,65 +446,6 @@ export class GameScene extends Phaser.Scene {
 
   // --- rendering ----------------------------------------------------------
 
-  private drawSky() {
-    const marginX = this.worldW + 2000;
-    const marginY = this.worldH + 2000;
-    const left = -marginX;
-    const top = -marginY;
-    const totalW = this.worldW + marginX * 2;
-    const totalH = this.worldH + marginY * 2;
-
-    // OUTER background = one textured dirt object across the padded backdrop.
-    if (this.ensureDirtTexture()) {
-      this.add
-        .tileSprite(left, top, totalW, totalH, "dirt")
-        .setOrigin(0, 0)
-        .setDepth(-14);
-    } else {
-      this.add
-        .rectangle(left, top, totalW, totalH, COLORS.dirt)
-        .setOrigin(0, 0)
-        .setDepth(-14);
-    }
-
-    // INNER background = the checkerboard grid, filling ONLY the map rectangle
-    // (the area the ball plays against), mirroring the original's grid backdrop.
-    if (this.textures.exists("checkerboard")) {
-      const grid = this.add
-        .tileSprite(0, 0, this.worldW, this.worldH, "checkerboard")
-        .setOrigin(0, 0)
-        .setDepth(-12);
-      grid.tileScaleX = 12.5;
-      grid.tileScaleY = 12.5;
-    }
-  }
-
-  private ensureDirtTexture(): boolean {
-    if (this.textures.exists("dirt")) return true;
-    if (!this.textures.exists("tileset")) return false;
-    const tex = this.textures.get("tileset");
-    const frame = tex.get(DIRT_FRAME);
-    const source = tex.getSourceImage() as CanvasImageSource;
-    if (!frame || !source) return false;
-    const canvasTex = this.textures.createCanvas("dirt", TILE, TILE);
-    if (!canvasTex) return false;
-    const ctx = canvasTex.getContext();
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(
-      source,
-      frame.cutX,
-      frame.cutY,
-      SOURCE_TILE,
-      SOURCE_TILE,
-      0,
-      0,
-      TILE,
-      TILE,
-    );
-    canvasTex.refresh();
-    return this.textures.exists("dirt");
-  }
-
   private renderTiles() {
     const { cols, rows, gids } = this.map;
     const frameCount = TILESET.columns * TILESET.rows;
@@ -576,223 +480,27 @@ export class GameScene extends Phaser.Scene {
 
   // --- physics geometry ---------------------------------------------------
 
-  private buildColliders() {
-    const { cols, rows, gids } = this.map;
-
-    // Solid, non-ramp cells: greedy-mesh into big cuboids for smooth rolling.
-    const solidKind: string[] = new Array(cols * rows).fill("");
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const gid = gids[row * cols + col] ?? 0;
-        if (gid <= 0) continue;
-        const id = cleanGid(gid) - 1;
-        if (rampShapeOfId(id)) continue; // ramps handled as triangles below
-        // Flags are decorations/sensors, never terrain. Only the platform
-        // tiles around them should create Rapier colliders.
-        if (isFlagId(id)) continue;
-        const role = roleOfGid(gid);
-        const solid =
-          role === "ground" ||
-          role === "ice" ||
-          role === "finish" ||
-          role === "checkpoint";
-        if (solid)
-          solidKind[row * cols + col] = role === "ice" ? "ice" : "solid";
-      }
-    }
-
-    const used: boolean[] = new Array(cols * rows).fill(false);
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const idx = row * cols + col;
-        const kind = solidKind[idx];
-        if (!kind || used[idx]) continue;
-
-        let w = 1;
-        while (
-          col + w < cols &&
-          solidKind[row * cols + col + w] === kind &&
-          !used[row * cols + col + w]
-        )
-          w++;
-
-        let h = 1;
-        outer: while (row + h < rows) {
-          for (let k = 0; k < w; k++) {
-            const j = (row + h) * cols + col + k;
-            if (solidKind[j] !== kind || used[j]) break outer;
-          }
-          h++;
-        }
-        for (let r = 0; r < h; r++)
-          for (let k = 0; k < w; k++) used[(row + r) * cols + col + k] = true;
-
-        const isIce = kind === "ice";
-        const cx = col * TILE + (w * TILE) / 2;
-        const cy = row * TILE + (h * TILE) / 2;
-        this.addStaticCuboid(
-          cx,
-          cy,
-          w * TILE,
-          h * TILE,
-          isIce ? 0.005 : BALL_FRICTION,
-          isIce ? "ice" : "ground",
-        );
-      }
-    }
-
-    // Ramps: true triangle colliders in the correct orientation.
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const gid = gids[row * cols + col] ?? 0;
-        if (gid <= 0) continue;
-        const id = cleanGid(gid) - 1;
-        const shape = rampShapeOfId(id);
-        if (shape) this.addRamp(col, row, shape);
-      }
-    }
-
-    // Sensors + finish zone.
-    const checkpointMask: boolean[] = new Array(cols * rows).fill(false);
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const gid = gids[row * cols + col] ?? 0;
-        if (gid <= 0) continue;
-        const id = cleanGid(gid) - 1;
-        const role = roleOfGid(gid);
-        const { x, y } = this.cellCenter(col, row);
-        const rect = new Phaser.Geom.Rectangle(
-          x - TILE / 2,
-          y - TILE / 2,
-          TILE,
-          TILE,
-        );
-        if (role === "water") this.waterRects.push(rect);
-        else if (role === "rough") this.roughRects.push(rect);
-        if (isCheckpointGroundId(id)) checkpointMask[row * cols + col] = true;
-      }
-    }
-    this.checkpointZones = this.buildCheckpointZones(checkpointMask);
-
-    const f = this.cellCenter(this.map.finish.col, this.map.finish.row);
-    this.finishZone = new Phaser.Geom.Rectangle(
-      f.x - TILE,
-      f.y - TILE * 1.5,
-      TILE * 2,
-      TILE * 2.5,
-    );
-
-    const sp = this.cellCenter(this.map.spawn.col, this.map.spawn.row);
-    this.startPos.set(sp.x, sp.y - TILE * 0.5);
+  /** Build the static Rapier geometry + sensor rects from the map. */
+  private buildStaticGeometry() {
+    const built = buildColliders({
+      map: this.map,
+      world: this.world,
+      groundHandles: this.groundHandles,
+      nearestFlagTarget: (x, y) => this.nearestCheckpointFlagTarget(x, y),
+    });
+    this.waterRects = built.waterRects;
+    this.roughRects = built.roughRects;
+    this.checkpointZones = built.checkpointZones;
+    this.finishZone = built.finishZone;
+    this.startPos.copy(built.startPos);
     this.respawn.copy(this.startPos);
-  }
-
-  private buildCheckpointZones(checkpointMask: boolean[]): CheckpointZone[] {
-    const { cols, rows } = this.map;
-    const zones: CheckpointZone[] = [];
-    const padX = TILE * 0.45;
-    const topPad = TILE * 1.25;
-    const bottomPad = TILE * 0.4;
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        if (!checkpointMask[row * cols + col]) continue;
-
-        const startCol = col;
-        while (col + 1 < cols && checkpointMask[row * cols + col + 1]) col++;
-        const endCol = col;
-        const width = (endCol - startCol + 1) * TILE;
-        const zoneCenter = new Phaser.Math.Vector2(
-          startCol * TILE + width / 2,
-          row * TILE - TILE / 2,
-        );
-        const target = this.nearestCheckpointFlagTarget(
-          zoneCenter.x,
-          zoneCenter.y,
-        );
-
-        zones.push({
-          key: `${startCol}-${endCol},${row}`,
-          row,
-          startCol,
-          endCol,
-          rank: target.rank,
-          respawn: target.point,
-          rect: new Phaser.Geom.Rectangle(
-            startCol * TILE - padX,
-            row * TILE - topPad,
-            width + padX * 2,
-            TILE + topPad + bottomPad,
-          ),
-        });
-      }
-    }
-
-    return zones;
-  }
-
-  private addStaticCuboid(
-    cxPx: number,
-    cyPx: number,
-    wPx: number,
-    hPx: number,
-    friction: number,
-    label: "ground" | "ice",
-  ) {
-    const desc = RAPIER.ColliderDesc.cuboid(
-      this.pxToM(wPx) / 2,
-      this.pxToM(hPx) / 2,
-    )
-      .setTranslation(this.pxToM(cxPx), this.pxToM(cyPx))
-      .setRestitution(0.12)
-      .setFriction(friction);
-    const collider = this.world.createCollider(desc);
-    this.groundHandles.add(collider.handle);
-    void label;
-  }
-
-  private addRamp(col: number, row: number, shape: RampShape) {
-    const x0 = this.pxToM(col * TILE);
-    const y0 = this.pxToM(row * TILE);
-    const s = this.pxToM(TILE);
-    // Triangle corners per orientation (physics y grows downward like screen).
-    let a: { x: number; y: number };
-    let b: { x: number; y: number };
-    let c: { x: number; y: number };
-    switch (shape) {
-      case "ground-up": // slope rising to the right, solid below
-        a = { x: x0, y: y0 + s };
-        b = { x: x0 + s, y: y0 + s };
-        c = { x: x0 + s, y: y0 };
-        break;
-      case "ground-down": // slope falling to the right, solid below
-        a = { x: x0, y: y0 };
-        b = { x: x0, y: y0 + s };
-        c = { x: x0 + s, y: y0 + s };
-        break;
-      case "ceiling-up": // slope on the ceiling, solid above
-        a = { x: x0, y: y0 };
-        b = { x: x0 + s, y: y0 };
-        c = { x: x0, y: y0 + s };
-        break;
-      case "ceiling-down":
-        a = { x: x0, y: y0 };
-        b = { x: x0 + s, y: y0 };
-        c = { x: x0 + s, y: y0 + s };
-        break;
-    }
-    const desc = RAPIER.ColliderDesc.triangle(a, b, c)
-      .setRestitution(0.12)
-      .setFriction(BALL_FRICTION);
-    const collider = this.world.createCollider(desc);
-    this.groundHandles.add(collider.handle);
   }
 
   // --- coins --------------------------------------------------------------
 
   private createCoins() {
-    this.ensureCoinTexture();
-    const spots = this.pickCoinSpots();
+    ensureCoinTexture(this);
+    const spots = pickCoinSpots(this.map, this.dateKey, this.mapId);
     for (const spot of spots) {
       const id = `coin-${spot.col}-${spot.row}`;
       if (this.collectedCoinIds.has(id)) continue;
@@ -802,108 +510,14 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({
         targets: sprite,
         y: y - 5,
-        duration: 760 + (this.hashCell(spot.col, spot.row) % 260),
+        duration:
+          760 + (hashCell(this.dateKey, this.mapId, spot.col, spot.row) % 260),
         yoyo: true,
         repeat: -1,
         ease: "Sine.easeInOut",
       });
       this.coins.push({ id, sprite, x, y });
     }
-  }
-
-  private ensureCoinTexture() {
-    if (this.textures.exists("coin")) return;
-    const size = 24;
-    const c = size / 2;
-    const g = this.make.graphics({ x: 0, y: 0 }, false);
-    g.fillStyle(0x000000, 0.25);
-    g.fillEllipse(c + 2, c + 3, 18, 10);
-    g.fillStyle(0x8a4b0f, 1);
-    g.fillCircle(c, c, 10);
-    g.fillStyle(0xffd65a, 1);
-    g.fillCircle(c, c, 8);
-    g.fillStyle(0xfff1a6, 0.95);
-    g.fillCircle(c - 3, c - 4, 3);
-    g.lineStyle(2, 0x6b3a09, 1);
-    g.strokeCircle(c, c, 9);
-    g.generateTexture("coin", size, size);
-    g.destroy();
-  }
-
-  private pickCoinSpots(): Array<{ col: number; row: number }> {
-    const candidates: Array<{ col: number; row: number; hash: number }> = [];
-    for (let row = 0; row < this.map.rows - 1; row++) {
-      for (let col = 0; col < this.map.cols; col++) {
-        if (!this.isStandableCoinCell(col, row)) continue;
-        if (
-          this.cellDistanceSq(
-            col,
-            row,
-            this.map.spawn.col,
-            this.map.spawn.row,
-          ) < 18
-        ) {
-          continue;
-        }
-        if (
-          this.cellDistanceSq(
-            col,
-            row,
-            this.map.finish.col,
-            this.map.finish.row,
-          ) < 12
-        ) {
-          continue;
-        }
-        candidates.push({ col, row, hash: this.hashCell(col, row) });
-      }
-    }
-
-    candidates.sort((a, b) => a.hash - b.hash);
-    const picked: Array<{ col: number; row: number }> = [];
-    for (const c of candidates) {
-      if (
-        picked.some((p) => this.cellDistanceSq(c.col, c.row, p.col, p.row) < 36)
-      ) {
-        continue;
-      }
-      picked.push({ col: c.col, row: c.row });
-      if (picked.length >= MAX_COINS_PER_DAILY_MAP) break;
-    }
-    return picked;
-  }
-
-  private isStandableCoinCell(col: number, row: number): boolean {
-    if (this.gidAt(col, row) !== 0) return false;
-    const belowRole = roleOfGid(this.gidAt(col, row + 1));
-    return (
-      belowRole === "ground" ||
-      belowRole === "ice" ||
-      belowRole === "ramp-up" ||
-      belowRole === "ramp-down" ||
-      belowRole === "checkpoint"
-    );
-  }
-
-  private cellDistanceSq(
-    aCol: number,
-    aRow: number,
-    bCol: number,
-    bRow: number,
-  ): number {
-    const dx = aCol - bCol;
-    const dy = aRow - bRow;
-    return dx * dx + dy * dy;
-  }
-
-  private hashCell(col: number, row: number): number {
-    const key = `${this.dateKey}:${this.mapId}:${col}:${row}`;
-    let h = 2166136261;
-    for (let i = 0; i < key.length; i++) {
-      h ^= key.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
   }
 
   private collectCoin(coin: CoinPickup) {
@@ -964,9 +578,9 @@ export class GameScene extends Phaser.Scene {
       .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     this.ballCollider = this.world.createCollider(colDesc, this.ballBody);
 
-    this.ensureBallTexture();
+    ensureBallTexture(this, this.ballSkin);
     this.ball = this.add
-      .image(this.respawn.x, this.respawn.y, this.ballTextureKey())
+      .image(this.respawn.x, this.respawn.y, ballTextureKey(this.ballSkin))
       .setDepth(40);
     this.strokeLabel = this.add
       .text(this.ball.x, this.ball.y - BALL_VISUAL_RADIUS - 10, "0", {
@@ -981,62 +595,9 @@ export class GameScene extends Phaser.Scene {
       .setDepth(65);
   }
 
-  /**
-   * Build the ball texture to match the bundle: white body (r=18) with a dark
-   * outline, an offset drop shadow, a soft warm highlight upper-left, and a few
-   * dimples. Drawn once into a reusable texture.
-   */
-  private ballTextureKey(): string {
-    return `hgball-${this.ballSkin}`;
-  }
-
   private applyBallSkin() {
-    this.ensureBallTexture();
-    if (this.ball) this.ball.setTexture(this.ballTextureKey());
-  }
-
-  private ensureBallTexture() {
-    const key = this.ballTextureKey();
-    if (this.textures.exists(key)) return;
-    const skin = getBallSkin(this.ballSkin);
-    const R = BALL_VISUAL_RADIUS;
-    const pad = 6;
-    const c = R + pad; // texture centre
-    const size = c * 2;
-    const g = this.make.graphics({ x: 0, y: 0 }, false);
-
-    // Drop shadow (offset down-right).
-    g.fillStyle(0x000000, 0.3);
-    g.fillCircle(c + 3, c + 3, R);
-    // Dark base ring / outline backing.
-    g.fillStyle(0x000000, 0.7);
-    g.fillCircle(c, c, R + 1);
-    // Skin body.
-    g.fillStyle(skin.body, 1);
-    g.fillCircle(c, c, R);
-    // Soft warm highlights upper-left (kept small so they stay on the ball).
-    g.fillStyle(skin.highlight, 0.22);
-    g.fillCircle(c - 6, c - 6, R * 0.55);
-    g.fillStyle(skin.highlight, 0.18);
-    g.fillCircle(c - 6.3, c - 6.3, R * 0.38);
-    // Dimples.
-    g.fillStyle(skin.dimple, 0.9);
-    const dimples = [
-      { x: 4, y: 6 },
-      { x: -7, y: 3 },
-      { x: 6, y: -4 },
-      { x: -3, y: -8 },
-      { x: 9, y: -2 },
-      { x: -9, y: -3 },
-      { x: 1, y: 10 },
-    ];
-    for (const d of dimples) g.fillCircle(c + d.x, c + d.y, 1.1);
-    // Outline.
-    g.lineStyle(2, skin.outline, 1);
-    g.strokeCircle(c, c, R);
-
-    g.generateTexture(key, size, size);
-    g.destroy();
+    ensureBallTexture(this, this.ballSkin);
+    if (this.ball) this.ball.setTexture(ballTextureKey(this.ballSkin));
   }
 
   /** Trigger the squash/stretch pulse along `angle` with `intensity` (0..1). */
@@ -1286,6 +847,18 @@ export class GameScene extends Phaser.Scene {
     this.applyChargeZoom(raw);
   }
 
+  /** Live-scene facts the trajectory prediction has to mirror. */
+  private trajectoryEnv(): TrajectoryEnv {
+    return {
+      groundHandles: this.groundHandles,
+      waterRects: this.waterRects,
+      roughRects: this.roughRects,
+      slimePatches: this.slimePatches,
+      worldW: this.worldW,
+      worldH: this.worldH,
+    };
+  }
+
   private drawTrajectoryPreview(v: Phaser.Math.Vector2) {
     this.trajectoryGfx.clear();
     const launch = this.launchVectorFromDrag(v);
@@ -1309,7 +882,8 @@ export class GameScene extends Phaser.Scene {
       collider.setFriction(BALL_FRICTION);
       collider.setRestitution(BALL_RESTITUTION);
 
-      const points = this.predictTrajectoryPoints(
+      const points = predictTrajectoryPoints(
+        this.trajectoryEnv(),
         predictionWorld,
         body,
         collider,
@@ -1325,117 +899,6 @@ export class GameScene extends Phaser.Scene {
     } finally {
       predictionWorld?.free();
     }
-  }
-
-  private predictTrajectoryPoints(
-    world: World,
-    body: RigidBody,
-    collider: Collider,
-  ): Phaser.Math.Vector2[] {
-    const points: Phaser.Math.Vector2[] = [];
-    const maxSteps = Math.round(TRAJECTORY_PREVIEW_SECONDS / PHYSICS_TIMESTEP);
-
-    for (let step = 1; step <= maxSteps; step++) {
-      this.applyPredictionSettleModel(world, body, collider);
-      world.step();
-
-      const pos = body.translation();
-      const x = pos.x * PIXELS_PER_METER;
-      const y = pos.y * PIXELS_PER_METER;
-
-      if (step % TRAJECTORY_SAMPLE_STEPS === 0) {
-        points.push(new Phaser.Math.Vector2(x, y));
-      }
-
-      if (step % TRAJECTORY_SENSOR_STEPS === 0) {
-        const stop = this.applyPredictionSensors(body, x, y);
-        if (stop) break;
-      }
-
-      if (this.predictionOutOfBounds(x, y)) break;
-      if (
-        step > TRAJECTORY_SENSOR_STEPS &&
-        this.predictionResting(world, body, collider)
-      ) {
-        if (step % TRAJECTORY_SAMPLE_STEPS !== 0) {
-          points.push(new Phaser.Math.Vector2(x, y));
-        }
-        break;
-      }
-    }
-
-    return points;
-  }
-
-  private applyPredictionSettleModel(
-    world: World,
-    body: RigidBody,
-    collider: Collider,
-  ) {
-    const v = body.linvel();
-    const slow = Math.hypot(v.x, v.y) < BALL_SLOW_SPEED;
-    const settle = slow && this.predictionGrounded(world, collider);
-    body.setLinearDamping(settle ? BALL_SETTLE_DAMPING : BALL_LINEAR_DAMPING);
-    collider.setRestitution(
-      settle ? BALL_SETTLE_RESTITUTION : BALL_RESTITUTION,
-    );
-  }
-
-  private predictionGrounded(world: World, collider: Collider): boolean {
-    let grounded = false;
-    world.contactPairsWith(collider, (other) => {
-      if (this.groundHandles.has(other.handle)) grounded = true;
-    });
-    return grounded;
-  }
-
-  private predictionResting(
-    world: World,
-    body: RigidBody,
-    collider: Collider,
-  ): boolean {
-    const v = body.linvel();
-    return (
-      Math.hypot(v.x, v.y) < REST_SPEED &&
-      this.predictionGrounded(world, collider)
-    );
-  }
-
-  private applyPredictionSensors(
-    body: RigidBody,
-    x: number,
-    y: number,
-  ): PredictionStop {
-    const ballCircle = new Phaser.Geom.Circle(x, y, BALL_RADIUS * 0.7);
-    for (const r of this.waterRects) {
-      if (Phaser.Geom.Intersects.CircleToRectangle(ballCircle, r))
-        return "water";
-    }
-
-    for (const r of this.roughRects) {
-      if (Phaser.Geom.Rectangle.Contains(r, x, y)) {
-        const v = body.linvel();
-        body.setLinvel({ x: v.x * 0.9, y: v.y * 0.94 }, true);
-        break;
-      }
-    }
-
-    const stickyCircle = new Phaser.Geom.Circle(x, y, BALL_RADIUS * 1.05);
-    for (const patch of this.slimePatches) {
-      if (Phaser.Geom.Intersects.CircleToCircle(stickyCircle, patch.circle)) {
-        body.setLinvel({ x: 0, y: 0 }, true);
-        body.setAngvel(0, true);
-        return "slime";
-      }
-    }
-
-    return null;
-  }
-
-  private predictionOutOfBounds(x: number, y: number): boolean {
-    return (
-      x < -TILE || x > this.worldW + TILE || y < -TILE || y > this.worldH + 400
-    );
   }
 
   private placeStickySlimeFromPointer(p: Phaser.Input.Pointer) {
@@ -1516,7 +979,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private playGeneratedCheckpoint(x: number, y: number) {
-    this.ensureGeneratedCheckpointTexture();
+    ensureGeneratedCheckpointTexture(this);
     const flag = this.add
       .image(x, y - TILE * 0.85, "generated-checkpoint")
       .setDepth(36);
@@ -1524,24 +987,6 @@ export class GameScene extends Phaser.Scene {
       sprite: flag,
       rank: this.bestCheckpointRank + 0.5,
     });
-  }
-
-  private ensureGeneratedCheckpointTexture() {
-    if (this.textures.exists("generated-checkpoint")) return;
-    const g = this.make.graphics({ x: 0, y: 0 }, false);
-    g.lineStyle(3, 0x3b2a14, 1);
-    g.beginPath();
-    g.moveTo(10, 42);
-    g.lineTo(10, 8);
-    g.strokePath();
-    g.fillStyle(0xfff1a6, 1);
-    g.fillTriangle(12, 9, 30, 15, 12, 23);
-    g.lineStyle(2, 0x7c4a03, 1);
-    g.strokeTriangle(12, 9, 30, 15, 12, 23);
-    g.fillStyle(0x047857, 1);
-    g.fillEllipse(10, 43, 18, 7);
-    g.generateTexture("generated-checkpoint", 36, 48);
-    g.destroy();
   }
 
   /**

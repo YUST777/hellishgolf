@@ -20,8 +20,22 @@ tools/               Dev-only scripts (local preview server)
 | --- | --- |
 | `game.html` | DOM shell: HUD, menus, shop, leaderboard, tutorial dialogs |
 | `styles.css` | All UI styling, including boot/inline presentation modes |
-| `game/main.ts` | Boot sequence, DOM wiring, powerup HUD, shop, leaderboard |
-| `game/GameScene.ts` | The Phaser scene: tilemap rendering, ball physics, powerups |
+| `game/main.ts` | Client bootstrap: init fetch, Rapier load, game start |
+| `game/state.ts` | Shared mutable session state (`ctx`) + boot-preview bridge |
+| `game/wiring.ts` | DOM control wiring, scene-event bridge, quick guide |
+| `game/session.ts` | Map loading, Phaser boot, finish handling, hole restart |
+| `game/hud.ts` | Strokes/best/streak HUD and the powerup quick bar |
+| `game/shop.ts` | Shop overlay: powerup purchases, skin buy/equip |
+| `game/leaderboard.ts` | Leaderboard overlay fetch + render |
+| `game/result.ts` | Result modal, confetti, next-hole countdown |
+| `game/settings.ts` | Zoom / sound / Infuriating Mode preferences |
+| `game/dom.ts` | `el`/`show`/`hide`/`toast` DOM helpers |
+| `game/GameScene.ts` | The Phaser scene: ball physics, input, powerups, sensors |
+| `game/colliders.ts` | Static Rapier geometry + sensor rects from the tilemap |
+| `game/trajectory.ts` | Trajectory powerup prediction on a snapshot world |
+| `game/coinSpots.ts` | Deterministic daily coin placement |
+| `game/sceneTextures.ts` | Procedural textures (ball, coin, flag) + backdrop |
+| `game/sceneTypes.ts` | Shared scene types (zones, pickups, launch vectors) |
 | `game/physics.ts` | Rapier 2D WASM bootstrap |
 | `game/api.ts` | `/api/*` client with a static-host (offline) fallback |
 | `game/inlineMode.ts` | Inline feed presentation: game-only view, tap to expand |
