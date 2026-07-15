@@ -85,14 +85,11 @@ export async function getStreak(username: string): Promise<number> {
 export async function getBest(
   dateKey: string,
   postId: string,
+  accountId: string,
   username: string,
 ): Promise<number | null> {
   if (await isSupabaseConfigured()) {
-    try {
-      return await getSupabaseBest(dateKey, postId, username);
-    } catch (error) {
-      console.error("Supabase getBest failed; falling back to Redis:", error);
-    }
+    return getSupabaseBest(dateKey, postId, accountId);
   }
 
   const score = await redis.zScore(lbKey(dateKey, postId), username);
@@ -125,6 +122,7 @@ async function bumpStreak(username: string, dateKey: string): Promise<number> {
 export async function submitScore(params: {
   dateKey: string;
   postId: string;
+  accountId: string;
   username: string;
   mapId: number;
   strokes: number;
@@ -133,26 +131,20 @@ export async function submitScore(params: {
 }): Promise<SubmitScoreResponse> {
   const { dateKey, postId, username, strokes, timeMs } = params;
   const moves = sanitizeReplayMoves(params.moves);
-  const streak = await bumpStreak(username, dateKey);
+  const streak = await bumpStreak(params.accountId, dateKey);
 
   if (await isSupabaseConfigured()) {
-    try {
-      return await submitSupabaseScore({
-        dateKey,
-        postId,
-        username,
-        mapId: params.mapId,
-        strokes,
-        timeMs,
-        streak,
-        moves,
-      });
-    } catch (error) {
-      console.error(
-        "Supabase submitScore failed; falling back to Redis:",
-        error,
-      );
-    }
+    return submitSupabaseScore({
+      dateKey,
+      postId,
+      accountId: params.accountId,
+      username,
+      mapId: params.mapId,
+      strokes,
+      timeMs,
+      streak,
+      moves,
+    });
   }
 
   const key = lbKey(dateKey, postId);
@@ -191,20 +183,14 @@ export async function submitScore(params: {
 export async function leaderboard(params: {
   dateKey: string;
   postId: string;
+  accountId: string | null;
   username: string | null;
   limit?: number;
 }): Promise<LeaderboardResponse> {
-  const { dateKey, postId, username, limit = 10 } = params;
+  const { dateKey, postId, accountId, username, limit = 10 } = params;
 
   if (await isSupabaseConfigured()) {
-    try {
-      return await getSupabaseLeaderboard({ dateKey, postId, username, limit });
-    } catch (error) {
-      console.error(
-        "Supabase leaderboard failed; falling back to Redis:",
-        error,
-      );
-    }
+    return getSupabaseLeaderboard({ dateKey, postId, accountId, limit });
   }
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
   const rankings = await redisRankings(dateKey, postId);

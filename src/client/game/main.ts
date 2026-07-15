@@ -824,7 +824,7 @@ async function main() {
   try {
     // Load the Rapier engine (WASM) and the hole data in parallel.
     const [data] = await Promise.all([apiClient.init(), ensureRapier()]);
-    powerups = loadPowerupState(data.username);
+    powerups = loadPowerupState(data.accountId);
     accountBackedPlayer = Boolean(
       data.player &&
       data.postId !== "preview_post" &&

@@ -56,6 +56,8 @@ export interface DailyInfo {
 /** Info about the current player + post context. */
 export interface InitResponse {
   postId: string;
+  /** Immutable Reddit account ID supplied by Devvit (for example t2_...). */
+  accountId: string | null;
   username: string | null;
   daily: DailyInfo;
   /** The player's best (lowest) stroke count today, if any. */

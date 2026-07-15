@@ -16,6 +16,7 @@ const MAX_VELOCITY = 1_000;
 type CountRow = { count: number };
 type BestRow = { strokes: number; time_ms: number };
 type RankedRow = {
+  account_id: string;
   username: string;
   strokes: number;
   time_ms: number;
@@ -134,9 +135,19 @@ export async function isSupabaseConfigured(): Promise<boolean> {
 
 async function createSchema(db: postgres.Sql): Promise<void> {
   await db`
+    CREATE TABLE IF NOT EXISTS players (
+      account_id text PRIMARY KEY,
+      username text NOT NULL,
+      first_seen_at timestamptz NOT NULL DEFAULT now(),
+      last_seen_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await db`
     CREATE TABLE IF NOT EXISTS leaderboard (
       date_key text NOT NULL,
       post_id text NOT NULL,
+      account_id text NOT NULL,
       username text NOT NULL,
       map_id integer NOT NULL,
       strokes integer NOT NULL CHECK (strokes > 0),
@@ -145,7 +156,7 @@ async function createSchema(db: postgres.Sql): Promise<void> {
       replay_id text,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
-      PRIMARY KEY (date_key, post_id, username)
+      PRIMARY KEY (date_key, post_id, account_id)
     )
   `;
 
@@ -159,6 +170,7 @@ async function createSchema(db: postgres.Sql): Promise<void> {
       id text PRIMARY KEY,
       date_key text NOT NULL,
       post_id text NOT NULL,
+      account_id text NOT NULL,
       username text NOT NULL,
       map_id integer NOT NULL,
       strokes integer NOT NULL CHECK (strokes > 0),
@@ -170,7 +182,7 @@ async function createSchema(db: postgres.Sql): Promise<void> {
 
   await db`
     CREATE INDEX IF NOT EXISTS usermoves_player_idx
-    ON usermoves (date_key, post_id, username, created_at DESC)
+    ON usermoves (date_key, post_id, account_id, created_at DESC)
   `;
 
   await db`
@@ -181,6 +193,51 @@ async function createSchema(db: postgres.Sql): Promise<void> {
   await db`
     ALTER TABLE leaderboard
     ADD COLUMN IF NOT EXISTS replay_id text
+  `;
+
+  await db`ALTER TABLE leaderboard ADD COLUMN IF NOT EXISTS account_id text`;
+  await db`ALTER TABLE usermoves ADD COLUMN IF NOT EXISTS account_id text`;
+  await db`
+    UPDATE leaderboard
+    SET account_id = 'legacy:' || lower(username)
+    WHERE account_id IS NULL
+  `;
+  await db`
+    UPDATE usermoves
+    SET account_id = 'legacy:' || lower(username)
+    WHERE account_id IS NULL
+  `;
+  await db`ALTER TABLE leaderboard ALTER COLUMN account_id SET NOT NULL`;
+  await db`ALTER TABLE usermoves ALTER COLUMN account_id SET NOT NULL`;
+  await db`
+    DO $$
+    DECLARE current_key text;
+    BEGIN
+      SELECT string_agg(a.attname, ',' ORDER BY u.ordinality)
+      INTO current_key
+      FROM pg_constraint c
+      CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS u(attnum, ordinality)
+      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = u.attnum
+      WHERE c.conrelid = 'leaderboard'::regclass AND c.contype = 'p';
+
+      IF current_key IS DISTINCT FROM 'date_key,post_id,account_id' THEN
+        ALTER TABLE leaderboard DROP CONSTRAINT IF EXISTS leaderboard_pkey;
+        ALTER TABLE leaderboard
+          ADD CONSTRAINT leaderboard_pkey PRIMARY KEY (date_key, post_id, account_id);
+      END IF;
+    END $$
+  `;
+  await db`DROP INDEX IF EXISTS usermoves_player_idx`;
+  await db`
+    CREATE INDEX IF NOT EXISTS usermoves_player_idx
+    ON usermoves (date_key, post_id, account_id, created_at DESC)
+  `;
+  await db`ALTER TABLE players ENABLE ROW LEVEL SECURITY`;
+  await db`ALTER TABLE leaderboard ENABLE ROW LEVEL SECURITY`;
+  await db`ALTER TABLE usermoves ENABLE ROW LEVEL SECURITY`;
+  await db`
+    REVOKE ALL ON TABLE players, leaderboard, usermoves
+    FROM PUBLIC, anon, authenticated
   `;
 }
 
@@ -295,7 +352,7 @@ async function readySql(): Promise<postgres.Sql> {
 export async function getSupabaseBest(
   dateKey: string,
   postId: string,
-  username: string,
+  accountId: string,
 ): Promise<number | null> {
   const db = await readySql();
   const rows = await db<BestRow[]>`
@@ -303,7 +360,7 @@ export async function getSupabaseBest(
     FROM leaderboard
     WHERE date_key = ${dateKey}
       AND post_id = ${postId}
-      AND username = ${username}
+      AND account_id = ${accountId}
     LIMIT 1
   `;
   return rows[0]?.strokes ?? null;
@@ -312,6 +369,7 @@ export async function getSupabaseBest(
 export async function submitSupabaseScore(params: {
   dateKey: string;
   postId: string;
+  accountId: string;
   username: string;
   mapId: number;
   strokes: number;
@@ -329,6 +387,7 @@ export async function submitSupabaseScore(params: {
         id,
         date_key,
         post_id,
+        account_id,
         username,
         map_id,
         strokes,
@@ -339,6 +398,7 @@ export async function submitSupabaseScore(params: {
         ${replayId},
         ${params.dateKey},
         ${params.postId},
+        ${params.accountId},
         ${params.username},
         ${params.mapId},
         ${params.strokes},
@@ -351,6 +411,7 @@ export async function submitSupabaseScore(params: {
       INSERT INTO leaderboard (
         date_key,
         post_id,
+        account_id,
         username,
         map_id,
         strokes,
@@ -361,6 +422,7 @@ export async function submitSupabaseScore(params: {
       VALUES (
         ${params.dateKey},
         ${params.postId},
+        ${params.accountId},
         ${params.username},
         ${params.mapId},
         ${params.strokes},
@@ -368,8 +430,9 @@ export async function submitSupabaseScore(params: {
         ${params.streak},
         ${replayId}
       )
-      ON CONFLICT (date_key, post_id, username)
+      ON CONFLICT (date_key, post_id, account_id)
       DO UPDATE SET
+        username = EXCLUDED.username,
         map_id = EXCLUDED.map_id,
         strokes = EXCLUDED.strokes,
         time_ms = EXCLUDED.time_ms,
@@ -389,7 +452,7 @@ export async function submitSupabaseScore(params: {
       FROM leaderboard
       WHERE date_key = ${params.dateKey}
         AND post_id = ${params.postId}
-        AND username = ${params.username}
+        AND account_id = ${params.accountId}
       LIMIT 1
     `;
 
@@ -408,6 +471,7 @@ export async function submitSupabaseScore(params: {
     const youRows = await tx<RankedRow[]>`
       WITH ranked AS (
         SELECT
+          account_id,
           username,
           strokes,
           time_ms,
@@ -418,9 +482,9 @@ export async function submitSupabaseScore(params: {
         WHERE date_key = ${params.dateKey}
           AND post_id = ${params.postId}
       )
-      SELECT username, strokes, time_ms, rank
+      SELECT account_id, username, strokes, time_ms, rank
       FROM ranked
-      WHERE username = ${params.username}
+      WHERE account_id = ${params.accountId}
       LIMIT 1
     `;
 
@@ -438,10 +502,10 @@ export async function submitSupabaseScore(params: {
 export async function getSupabaseLeaderboard(params: {
   dateKey: string;
   postId: string;
-  username: string | null;
+  accountId: string | null;
   limit?: number;
 }): Promise<LeaderboardResponse> {
-  const { dateKey, postId, username, limit = 10 } = params;
+  const { dateKey, postId, accountId, limit = 10 } = params;
   const db = await readySql();
 
   const totalRows = await db<CountRow[]>`
@@ -454,6 +518,7 @@ export async function getSupabaseLeaderboard(params: {
   const topRows = await db<RankedRow[]>`
     WITH ranked AS (
       SELECT
+        account_id,
         username,
         strokes,
         time_ms,
@@ -464,7 +529,7 @@ export async function getSupabaseLeaderboard(params: {
       WHERE date_key = ${dateKey}
         AND post_id = ${postId}
     )
-    SELECT username, strokes, time_ms, rank
+    SELECT account_id, username, strokes, time_ms, rank
     FROM ranked
     ORDER BY rank ASC
     LIMIT ${limit}
@@ -477,10 +542,11 @@ export async function getSupabaseLeaderboard(params: {
   }));
 
   let you: LeaderboardEntry | null = null;
-  if (username) {
+  if (accountId) {
     const youRows = await db<RankedRow[]>`
       WITH ranked AS (
         SELECT
+          account_id,
           username,
           strokes,
           time_ms,
@@ -491,9 +557,9 @@ export async function getSupabaseLeaderboard(params: {
         WHERE date_key = ${dateKey}
           AND post_id = ${postId}
       )
-      SELECT username, strokes, time_ms, rank
+      SELECT account_id, username, strokes, time_ms, rank
       FROM ranked
-      WHERE username = ${username}
+      WHERE account_id = ${accountId}
       LIMIT 1
     `;
     const row = youRows[0];
@@ -507,4 +573,19 @@ export async function getSupabaseLeaderboard(params: {
   }
 
   return { entries, totalPlayers: totalRows[0]?.count ?? 0, you };
+}
+
+export async function registerSupabasePlayer(
+  accountId: string,
+  username: string,
+): Promise<boolean> {
+  if (!(await isSupabaseConfigured())) return false;
+  const db = await readySql();
+  await db`
+    INSERT INTO players (account_id, username)
+    VALUES (${accountId}, ${username})
+    ON CONFLICT (account_id)
+    DO UPDATE SET username = EXCLUDED.username, last_seen_at = now()
+  `;
+  return true;
 }

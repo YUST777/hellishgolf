@@ -23,19 +23,28 @@ import {
   isValidCoinId,
 } from "../core/player";
 import { getBest, getStreak, leaderboard, submitScore } from "../core/scoring";
+import { registerSupabasePlayer } from "../core/supabase";
 
 type ErrorResponse = { status: "error"; message: string };
 const MAX_SCORE_TIME_MS = 86_400_000;
 
 export const api = new Hono();
 
+async function currentRedditPlayer() {
+  const accountId = context.userId;
+  const username = context.username ?? (await reddit.getCurrentUsername());
+  if (!accountId || !username) {
+    throw new Error("Must be logged in with Reddit to update player data");
+  }
+  return { accountId, username };
+}
+
 async function currentPlayerContext() {
   const { postId } = context;
   if (!postId) throw new Error("postId is required");
-  const username = await reddit.getCurrentUsername();
-  if (!username) throw new Error("Must be logged in to update player data");
+  const { accountId, username } = await currentRedditPlayer();
   const { daily, mapId } = await getPostLevelInfo(postId);
-  return { username, daily, mapId };
+  return { accountId, username, daily, mapId };
 }
 
 /**
@@ -55,21 +64,28 @@ api.get("/init", async (c) => {
   }
 
   try {
-    const username = (await reddit.getCurrentUsername()) ?? null;
+    const accountId = context.userId ?? null;
+    const username =
+      context.username ?? (await reddit.getCurrentUsername()) ?? null;
     const { daily, mapId } = await getPostLevelInfo(postId);
 
+    if (accountId && username) {
+      await registerSupabasePlayer(accountId, username);
+    }
+
     const [bestToday, streak, player] = await Promise.all([
-      username
-        ? getBest(daily.dateKey, postId, username)
+      accountId && username
+        ? getBest(daily.dateKey, postId, accountId, username)
         : Promise.resolve(null),
-      username ? getStreak(username) : Promise.resolve(0),
-      username
-        ? getPlayerState(username, daily.dateKey, mapId)
+      accountId ? getStreak(accountId) : Promise.resolve(0),
+      accountId
+        ? getPlayerState(accountId, daily.dateKey, mapId)
         : Promise.resolve(null),
     ]);
 
     return c.json<InitResponse>({
       postId,
+      accountId,
       username,
       daily,
       bestToday,
@@ -89,9 +105,9 @@ api.post("/player/coin", async (c) => {
   try {
     const body = await c.req.json<CollectCoinRequest>();
     if (!isValidCoinId(body.coinId)) throw new Error("Invalid coin id");
-    const { username, daily, mapId } = await currentPlayerContext();
+    const { accountId, daily, mapId } = await currentPlayerContext();
     const player = await collectPlayerCoin({
-      username,
+      username: accountId,
       dateKey: daily.dateKey,
       mapId,
       coinId: body.coinId,
@@ -109,9 +125,9 @@ api.post("/player/powerup/buy", async (c) => {
   try {
     const body = await c.req.json<PowerupActionRequest>();
     if (!isPowerupKind(body.kind)) throw new Error("Invalid powerup kind");
-    const { username, daily, mapId } = await currentPlayerContext();
+    const { accountId, daily, mapId } = await currentPlayerContext();
     const player = await buyPlayerPowerup({
-      username,
+      username: accountId,
       dateKey: daily.dateKey,
       mapId,
       kind: body.kind,
@@ -129,9 +145,9 @@ api.post("/player/powerup/use", async (c) => {
   try {
     const body = await c.req.json<PowerupActionRequest>();
     if (!isPowerupKind(body.kind)) throw new Error("Invalid powerup kind");
-    const { username, daily, mapId } = await currentPlayerContext();
+    const { accountId, daily, mapId } = await currentPlayerContext();
     const player = await consumePlayerPowerup({
-      username,
+      username: accountId,
       dateKey: daily.dateKey,
       mapId,
       kind: body.kind,
@@ -149,9 +165,9 @@ api.post("/player/skin", async (c) => {
   try {
     const body = await c.req.json<SkinActionRequest>();
     if (!isKnownSkin(body.skinId)) throw new Error("Invalid skin id");
-    const { username, daily, mapId } = await currentPlayerContext();
+    const { accountId, daily, mapId } = await currentPlayerContext();
     const player = await choosePlayerSkin({
-      username,
+      username: accountId,
       dateKey: daily.dateKey,
       mapId,
       skinId: body.skinId,
@@ -167,9 +183,9 @@ api.post("/player/skin", async (c) => {
 
 api.post("/player/tutorial", async (c) => {
   try {
-    const { username, daily, mapId } = await currentPlayerContext();
+    const { accountId, daily, mapId } = await currentPlayerContext();
     const player = await completePlayerTutorial({
-      username,
+      username: accountId,
       dateKey: daily.dateKey,
       mapId,
     });
@@ -193,13 +209,7 @@ api.post("/score", async (c) => {
   }
 
   try {
-    const username = await reddit.getCurrentUsername();
-    if (!username) {
-      return c.json<ErrorResponse>(
-        { status: "error", message: "Must be logged in to submit a score" },
-        401,
-      );
-    }
+    const { accountId, username } = await currentRedditPlayer();
 
     const body = await c.req.json<SubmitScoreRequest>();
     const rawStrokes = Number(body.strokes);
@@ -215,6 +225,7 @@ api.post("/score", async (c) => {
     const result = await submitScore({
       dateKey: daily.dateKey,
       postId,
+      accountId,
       username,
       mapId,
       strokes,
@@ -242,11 +253,14 @@ api.get("/leaderboard", async (c) => {
   }
 
   try {
-    const username = (await reddit.getCurrentUsername()) ?? null;
+    const accountId = context.userId ?? null;
+    const username =
+      context.username ?? (await reddit.getCurrentUsername()) ?? null;
     const { daily } = await getPostLevelInfo(postId);
     const board = await leaderboard({
       dateKey: daily.dateKey,
       postId,
+      accountId,
       username,
     });
     return c.json<LeaderboardResponse>(board);

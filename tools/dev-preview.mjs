@@ -154,6 +154,7 @@ const server = createServer(async (req, res) => {
     const id = resolveMapId(url);
     return sendJson(res, 200, {
       postId: "preview_post",
+      accountId: "t2_preview",
       username: "you_the_dev",
       daily: { dateKey, holeNumber: 42, seed, mapId: id },
       bestToday: you ? you.strokes : null,

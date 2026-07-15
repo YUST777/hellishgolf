@@ -92,6 +92,7 @@ function offlineInit(): InitResponse {
   const { mapId, holeNumber, seed } = dailyMapId(dateKey);
   return {
     postId: "offline",
+    accountId: null,
     username: null,
     daily: { dateKey, holeNumber, seed, mapId },
     bestToday: offlineBest(dateKey),
