@@ -84,7 +84,8 @@
   stroke-width: 2;
 }
 
-.tutorial-step > .powerup-art {
+.tutorial-step > .powerup-art,
+.tutorial-step > .shop-art {
   width: 32px;
   height: 32px;
   justify-self: center;
@@ -175,7 +176,8 @@
     height: 23px;
   }
 
-  .tutorial-step > .powerup-art {
+  .tutorial-step > .powerup-art,
+  .tutorial-step > .shop-art {
     width: 26px;
     height: 26px;
   }

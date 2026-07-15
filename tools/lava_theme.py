@@ -71,13 +71,10 @@ def process(name, mode="tiles"):
                 continue
             nr, ng, nb = remap_pixel(r, g, b, mode)
             px[x, y] = (nr, ng, nb, a)
-    im.save(src)
+    im.save(src, lossless=True, method=6)
     print(f"themed {name} ({w}x{hgt}, mode={mode})")
 
 
-process("tilemap/tileset.png", "tiles")
-process("textures/finish.png", "tiles")
-process("textures/checkpoint.png", "tiles")
-process("textures/checkerboard.png", "tiles")
-process("textures/cloud.png", "smoke")
+process("tilemap/tileset.webp", "tiles")
+process("textures/checkerboard.webp", "tiles")
 print("done")

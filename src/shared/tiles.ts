@@ -183,7 +183,7 @@ export const finishFlagGid = T_FINISH_FLAG;
 /** The checkpoint flag tileId (NOT gid). */
 export const checkpointFlagGid = T_CHECKPOINT_FLAG;
 
-/** Tileset atlas geometry (from tilemap/tileset.png = 528x400, 16px tiles). */
+/** Tileset atlas geometry (from tilemap/tileset.webp = 528x400, 16px tiles). */
 export const TILESET = {
   imageWidth: 528,
   imageHeight: 400,

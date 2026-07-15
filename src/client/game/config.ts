@@ -3,7 +3,7 @@
 /** Native atlas frame size and rendered world tile size. */
 export const SOURCE_TILE = 16;
 export const TILE = 32;
-export const TILESET_URL = "game/tilemap/tileset.png";
+export const TILESET_URL = "game/tilemap/tileset.webp";
 export const DIRT_FRAME = 34;
 
 /** The original renders Rapier metres at 50 screen pixels per metre. */

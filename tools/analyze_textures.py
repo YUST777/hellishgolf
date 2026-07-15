@@ -5,14 +5,12 @@ from PIL import Image
 
 BASE = Path("public/game")
 paths = [
-    BASE / "tilemap" / "tileset.png",
-    BASE / "textures" / "cloud.png",
-    BASE / "textures" / "flag.png",
-    BASE / "textures" / "finish.png",
-    BASE / "textures" / "checkpoint.png",
-    BASE / "textures" / "drag-ball.png",
-    BASE / "textures" / "ball_backgrounds.png",
-    BASE / "textures" / "checkerboard.png",
+    BASE / "tilemap" / "tileset.webp",
+    BASE / "textures" / "checkerboard.webp",
+    BASE / "textures" / "trajectory_powerup_icon.webp",
+    BASE / "textures" / "slime_powerup_icon.webp",
+    BASE / "textures" / "checkpoint_powerup_icon.webp",
+    BASE / "textures" / "shop_icon.webp",
 ]
 
 for p in paths:

@@ -2,7 +2,7 @@
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "hellishgolf",
   "marketingAssets": {
-    "icon": "assets/icon.png"
+    "icon": "assets/icon.webp"
   },
   "post": {
     "dir": "dist/client",

@@ -47,5 +47,5 @@ for ry in range(rows):
 
 # Scaled preview for eyeballing.
 preview = sheet.resize((W * 4, H * 4), Image.NEAREST)
-preview.save("tools/lava_pack_sheet_preview.png")
-print("\nwrote tools/lava_pack_sheet_preview.png")
+preview.save("tools/lava_pack_sheet_preview.webp", lossless=True, method=6)
+print("\nwrote tools/lava_pack_sheet_preview.webp")

@@ -175,9 +175,9 @@ export class GameScene extends Phaser.Scene {
 
   /** Cursor CSS strings (image + hotspot) for each interaction state. */
   private static readonly CURSOR = {
-    default: "url(game/cursors/mouse_default.png) 0 0, auto",
-    grab: "url(game/cursors/hand_open.png) 8 6, grab",
-    shoot: "url(game/cursors/mouse_shoot.png) 8 8, crosshair",
+    default: "url(game/cursors/mouse_default.webp) 0 0, auto",
+    grab: "url(game/cursors/hand_open.webp) 8 6, grab",
+    shoot: "url(game/cursors/mouse_shoot.webp) 8 8, crosshair",
   } as const;
 
   constructor() {

@@ -1,6 +1,6 @@
 """Generate a seamless, looping, tileable animated lava spritesheet.
 
-Output: public/game/lava_anim.png  (N frames of 16x16 laid out horizontally).
+Output: public/game/lava_anim.webp  (N frames of 16x16 laid out horizontally).
 Uses integer-frequency sine fields so it tiles perfectly in x/y and loops in
 time, mapped through a molten palette with bright moving cracks.
 """
@@ -10,7 +10,7 @@ from PIL import Image
 
 T = 16
 N = 8
-OUT = Path("public/game/lava_anim.png")
+OUT = Path("public/game/lava_anim.webp")
 
 # Palette stops (position, RGB).
 STOPS = [
@@ -50,5 +50,5 @@ for f in range(N):
             r, g, b = palette(n)
             px[f * T + x, y] = (r, g, b, 255)
 
-sheet.save(OUT)
+sheet.save(OUT, lossless=True, method=6)
 print(f"wrote {OUT} ({sheet.width}x{sheet.height}, {N} frames)")
