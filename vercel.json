@@ -1,5 +1,9 @@
 {
   "buildCommand": "npm run build && cp dist/client/game.html dist/client/index.html",
   "outputDirectory": "dist/client",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/privacy", "destination": "/privacy.html" }
+  ]
 }
