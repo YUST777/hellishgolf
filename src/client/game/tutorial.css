@@ -1,11 +1,11 @@
 :root {
-  --tutorial-paper: #f4e4b5;
-  --tutorial-paper-light: #fff1c9;
-  --tutorial-ink: #4a2c18;
-  --tutorial-copy: #873a20;
-  --tutorial-border: #8a6a32;
-  --tutorial-green: #237d5b;
-  --tutorial-green-dark: #0c513b;
+  --tutorial-panel: #24272b;
+  --tutorial-ink: #f4efe6;
+  --tutorial-copy: #b7b0a4;
+  --tutorial-border: #4b5563;
+  --tutorial-accent: #d8b56d;
+  --tutorial-action: #4b5563;
+  --tutorial-action-hover: #5f6978;
 }
 
 .tutorial-gate {
@@ -13,10 +13,10 @@
   inset: 0;
   z-index: 2000;
   display: grid;
-  padding: 18px;
+  padding: 12px;
   place-items: center;
-  background: rgba(27, 20, 18, 0.62);
-  backdrop-filter: blur(3px);
+  background: rgba(15, 16, 18, 0.68);
+  backdrop-filter: blur(4px);
   pointer-events: auto;
   touch-action: none;
 }
@@ -26,49 +26,62 @@
 }
 
 .tutorial-card {
-  width: min(760px, calc(100vw - 28px));
-  max-height: calc(100dvh - 28px);
-  padding: clamp(22px, 4vh, 40px) clamp(22px, 5vw, 54px) 30px;
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 18px 20px 20px;
   overflow-y: auto;
   color: var(--tutorial-ink);
-  background: var(--tutorial-paper);
-  border: 7px solid var(--tutorial-border);
-  border-radius: 22px;
+  background: var(--tutorial-panel);
+  border: 1px solid var(--tutorial-border);
+  border-radius: 8px;
   box-shadow:
-    inset 0 0 0 5px var(--tutorial-paper-light),
-    0 18px 50px rgba(0, 0, 0, 0.48);
-  font-family: system-ui, sans-serif;
+    inset 0 1px rgba(255, 255, 255, 0.07),
+    0 20px 48px rgba(0, 0, 0, 0.5);
+  font-family: inherit;
 }
 
 .tutorial-card h2 {
-  margin: 0 0 clamp(20px, 3vh, 30px);
+  margin: 0 0 14px;
   color: var(--tutorial-ink);
-  font-size: clamp(30px, 5vw, 46px);
-  font-weight: 950;
+  font-size: 24px;
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: 1;
-  text-align: center;
-  text-transform: uppercase;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.tutorial-card h2::after {
+  display: block;
+  width: 34px;
+  height: 2px;
+  margin-top: 8px;
+  background: var(--tutorial-accent);
+  content: "";
 }
 
 .tutorial-steps {
   display: grid;
-  gap: clamp(13px, 2vh, 20px);
+  gap: 6px;
 }
 
 .tutorial-step {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
+  min-height: 54px;
+  padding: 7px 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(214, 205, 190, 0.09);
+  border-radius: 6px;
 }
 
 .tutorial-step > svg {
-  width: 48px;
-  height: 48px;
+  width: 28px;
+  height: 28px;
   justify-self: center;
-  color: #315b66;
-  stroke-width: 1.8;
+  color: var(--tutorial-accent);
+  stroke-width: 2;
 }
 
 .tutorial-step > .tutorial-coin-icon {
@@ -77,97 +90,95 @@
 }
 
 .tutorial-step h3 {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--tutorial-ink);
-  font-size: clamp(18px, 2.4vw, 27px);
-  font-weight: 900;
+  font-size: 15px;
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .tutorial-step p {
   margin: 0;
   color: var(--tutorial-copy);
-  font-size: clamp(14px, 1.8vw, 20px);
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.32;
+  line-height: 1.3;
 }
 
 .tutorial-done {
   width: 100%;
-  min-height: 68px;
-  margin-top: clamp(22px, 3vh, 32px);
-  color: #fffdf5;
-  background: var(--tutorial-green);
-  border: 5px solid var(--tutorial-green-dark);
-  border-radius: 18px;
-  box-shadow: 0 8px 0 rgba(12, 81, 59, 0.24);
-  font-size: clamp(21px, 3vw, 28px);
-  font-weight: 950;
+  min-height: 44px;
+  margin-top: 14px;
+  color: var(--tutorial-ink);
+  background: var(--tutorial-action);
+  border: 1px solid #687483;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.08),
+    0 3px 0 #2f3742;
+  font-size: 16px;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
 .tutorial-done:hover,
 .tutorial-done:focus-visible {
-  background: #2c926b;
-  outline: 3px solid #fff7d9;
+  color: #fff;
+  background: var(--tutorial-action-hover);
+  border-color: var(--tutorial-accent);
+  outline: 2px solid rgba(216, 181, 109, 0.45);
   outline-offset: 2px;
 }
 
 .tutorial-done:active {
-  transform: translateY(3px);
-  box-shadow: 0 4px 0 rgba(12, 81, 59, 0.24);
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #2f3742;
 }
 
 @media (max-width: 600px) {
   .tutorial-gate {
-    padding: 8px;
+    padding: 10px;
   }
 
   .tutorial-card {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 16px);
-    padding: 22px 18px 20px;
-    border-width: 5px;
-    border-radius: 18px;
-    box-shadow:
-      inset 0 0 0 3px var(--tutorial-paper-light),
-      0 14px 36px rgba(0, 0, 0, 0.5);
+    width: min(440px, calc(100vw - 20px));
+    max-height: calc(100dvh - 20px);
+    padding: 14px;
   }
 
   .tutorial-card h2 {
-    margin-bottom: 20px;
-    font-size: 29px;
+    margin-bottom: 10px;
+    font-size: 20px;
   }
 
   .tutorial-steps {
-    gap: 13px;
+    gap: 5px;
   }
 
   .tutorial-step {
-    grid-template-columns: 42px minmax(0, 1fr);
-    gap: 12px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 9px;
+    min-height: 48px;
+    padding: 6px;
   }
 
   .tutorial-step > svg {
-    width: 36px;
-    height: 36px;
+    width: 23px;
+    height: 23px;
   }
 
   .tutorial-step h3 {
-    margin-bottom: 2px;
-    font-size: 17px;
+    font-size: 14px;
   }
 
   .tutorial-step p {
-    font-size: 13px;
+    font-size: 11px;
   }
 
   .tutorial-done {
-    min-height: 58px;
-    margin-top: 20px;
-    border-width: 4px;
-    border-radius: 14px;
-    font-size: 21px;
+    min-height: 42px;
+    margin-top: 10px;
+    font-size: 15px;
   }
 }
