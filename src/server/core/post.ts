@@ -12,10 +12,23 @@ export async function createPost(opts?: { mapId?: number; title?: string }) {
     opts?.title ??
     `Hellish Golf \u2014 Hole #${daily.holeNumber} (${daily.dateKey})`;
 
-  const post = await reddit.submitCustomPost({
-    title,
-    subredditName: context.subredditName,
-  });
+  // Prefer posting as the requesting user (mod) so posts survive even when
+  // the app account is caught by Reddit's automated filters. Fall back to
+  // the app account (e.g. scheduler runs, which have no user context).
+  let post;
+  try {
+    post = await reddit.submitCustomPost({
+      title,
+      subredditName: context.subredditName,
+      runAs: "USER",
+      userGeneratedContent: { text: title },
+    });
+  } catch {
+    post = await reddit.submitCustomPost({
+      title,
+      subredditName: context.subredditName,
+    });
+  }
 
   await setPostMap(post.id, mapId);
   return post;
