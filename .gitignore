@@ -14,6 +14,7 @@ reference/
 .playwright-cli/
 output/
 .vercel/
+codex_cli.txt
 
 # OS/editor noise.
 .DS_Store

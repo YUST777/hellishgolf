@@ -4,6 +4,8 @@ Hellish Golf is a daily vertical golf challenge for Reddit, built with Devvit, P
 
 Players launch a golf ball through a difficult climbing course, collect coins, buy powerups, reach checkpoints, and compete for the lowest-stroke daily leaderboard. The Reddit feed shows an inline preview card, and opening the post launches the full game webview.
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a map of the codebase.
+
 ## Reddit Experience
 
 - Daily hole posts can be created from the moderator menu.
