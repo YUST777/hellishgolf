@@ -44,7 +44,8 @@
     var dateKey = todayKey();
     var seed = hashDate(dateKey);
     var mapId = MAP_IDS[seed % MAP_IDS.length];
-    var epoch = Date.UTC(2025, 0, 1);
+    // Must match LAUNCH_DATE_UTC in src/server/core/daily.ts (Day #1).
+    var epoch = Date.UTC(2026, 6, 15);
     var holeNumber = Math.floor((Date.parse(dateKey) - epoch) / 86400000) + 1;
     return {
       postId: "offline",
