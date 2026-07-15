@@ -28,7 +28,6 @@
     "canvas-confetti": "^1.9.4",
     "devvit": "0.13.7",
     "dotenv": "^17.4.2",
-    "driver.js": "1.6.0",
     "hono": "4.12.28",
     "phaser": "4.2.0",
     "postgres": "^3.4.9"

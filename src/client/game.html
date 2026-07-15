@@ -1393,21 +1393,105 @@
 
     <div id="toast"></div>
 
-    <div
-      class="tutorial-feature-markers"
-      id="tutorial-feature-markers"
+    <aside
+      id="quick-guide"
+      class="quick-guide"
+      aria-labelledby="quick-guide-title"
       hidden
-      aria-hidden="true"
     >
-      <div class="tutorial-feature-anchor" id="tutorial-checkpoint-anchor">
-        <svg aria-hidden="true"><use href="#icon-checkpoint"></use></svg>
-        <span>Checkpoint</span>
+      <div class="quick-guide-header">
+        <div>
+          <span class="quick-guide-kicker">First round</span>
+          <h2 id="quick-guide-title">Quick Guide</h2>
+        </div>
+        <button
+          id="quick-guide-close"
+          class="quick-guide-control quick-guide-close"
+          title="Close guide"
+          aria-label="Close guide"
+        >
+          <svg class="ui-icon" aria-hidden="true">
+            <use href="#icon-close"></use>
+          </svg>
+        </button>
       </div>
-      <div class="tutorial-feature-anchor" id="tutorial-finish-anchor">
-        <svg aria-hidden="true"><use href="#icon-finish"></use></svg>
-        <span>Finish</span>
+
+      <div class="quick-guide-scroll" tabindex="0">
+        <section class="quick-guide-item quick-guide-item-wide">
+          <svg class="ui-icon" aria-hidden="true">
+            <use href="#icon-trajectory"></use>
+          </svg>
+          <p>
+            <strong>Shoot.</strong> Press the ball, drag opposite your target,
+            then release. A longer pull hits harder. Lowest strokes wins; time
+            breaks ties.
+          </p>
+        </section>
+
+        <section class="quick-guide-item quick-guide-item-wide">
+          <svg class="quick-guide-coin" aria-hidden="true">
+            <use href="#icon-coin"></use>
+          </svg>
+          <p>
+            <strong>Collect and spend.</strong> Grab each daily-map coin once.
+            The Shop sells power-ups and cosmetic ball skins. Every account
+            starts with 3 of each power-up.
+          </p>
+        </section>
+
+        <div class="quick-guide-powerups" aria-label="Power-up effects">
+          <div class="quick-guide-powerup">
+            <svg class="ui-icon" aria-hidden="true">
+              <use href="#icon-trajectory"></use>
+            </svg>
+            <span><strong>Trajectory</strong> previews one shot.</span>
+          </div>
+          <div class="quick-guide-powerup">
+            <svg class="ui-icon filled" aria-hidden="true">
+              <use href="#icon-sticky"></use>
+            </svg>
+            <span><strong>Sticky Slime</strong> coats a chosen wall.</span>
+          </div>
+          <div class="quick-guide-powerup">
+            <svg class="ui-icon" aria-hidden="true">
+              <use href="#icon-checkpoint"></use>
+            </svg>
+            <span
+              ><strong>Checkpoint</strong> makes a grounded return flag.</span
+            >
+          </div>
+        </div>
+
+        <div class="quick-guide-endgame">
+          <section class="quick-guide-item">
+            <svg class="ui-icon" aria-hidden="true">
+              <use href="#icon-checkpoint"></use>
+            </svg>
+            <p>
+              <strong>Checkpoints.</strong> Land on the ground. Flags are
+              non-solid, and lower checkpoints never replace higher progress.
+            </p>
+          </section>
+
+          <section class="quick-guide-item">
+            <svg class="ui-icon" aria-hidden="true">
+              <use href="#icon-finish"></use>
+            </svg>
+            <p>
+              <strong>Win.</strong> Land and stop on the finish platform to
+              submit your score and replay.
+            </p>
+          </section>
+        </div>
       </div>
-    </div>
+
+      <div class="quick-guide-footer">
+        <span>Shooting stays active while this guide is open.</span>
+        <button id="quick-guide-done" class="quick-guide-control">
+          Got it
+        </button>
+      </div>
+    </aside>
 
     <!-- Menu modal -->
     <div class="overlay hidden" id="menu-overlay">

@@ -1,7 +1,5 @@
 import Phaser from "phaser";
 import confetti from "canvas-confetti";
-import { driver, type Driver } from "driver.js";
-import "driver.js/dist/driver.css";
 import "./tutorial.css";
 import { GameScene } from "./GameScene";
 import {
@@ -90,7 +88,6 @@ let toastTimer: number | null = null;
 let activePowerup: PowerupKind | null = null;
 let accountBackedPlayer = false;
 let economyRequestPending = false;
-let onboarding: Driver | null = null;
 type ShopTab = "powerups" | "skins";
 let activeShopTab: ShopTab = "powerups";
 
@@ -574,212 +571,26 @@ function hide(id: string) {
   el(id).classList.add("hidden");
 }
 
-function cleanupTutorialUi() {
-  hide("shop-overlay");
-  el<HTMLElement>("tutorial-feature-markers").hidden = true;
-}
+function dismissQuickGuide() {
+  el<HTMLElement>("quick-guide").hidden = true;
+  if (powerups.tutorialComplete) return;
 
-function finishTutorial() {
-  onboarding = null;
-  cleanupTutorialUi();
-  if (!powerups.tutorialComplete) {
-    completeTutorial(powerups);
-    updatePowerupHud();
-  }
+  completeTutorial(powerups);
+  updatePowerupHud();
   if (!accountBackedPlayer) return;
+
   void apiClient
     .completeTutorial()
     .then((response) => syncPlayerState(response.player))
     .catch((error) => console.error("tutorial sync failed", error));
 }
 
-function showFeatureMarkers(showMarkers: boolean) {
-  el<HTMLElement>("tutorial-feature-markers").hidden = !showMarkers;
-}
-
-function startTutorial(force = false) {
-  if (!game || !init || onboarding?.isActive()) return;
+function showQuickGuide(force = false) {
+  if (!game || !init) return;
   if (!force && powerups.tutorialComplete) return;
 
   hide("menu-overlay");
-  hide("settings-overlay");
-  hide("leaderboard-overlay");
-  hide("result-overlay");
-  cleanupTutorialUi();
-
-  onboarding = driver({
-    animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    allowClose: true,
-    allowKeyboardControl: true,
-    disableActiveInteraction: true,
-    overlayColor: "#08090b",
-    overlayOpacity: 0.72,
-    stagePadding: 7,
-    stageRadius: 6,
-    popoverOffset: 12,
-    popoverClass: "hellish-tour",
-    showButtons: ["next", "previous", "close"],
-    showProgress: true,
-    progressText: "{{current}} / {{total}}",
-    nextBtnText: "NEXT",
-    prevBtnText: "BACK",
-    doneBtnText: "PLAY",
-    onPopoverRender: (popover) => {
-      popover.closeButton.title = "Skip tutorial";
-      popover.closeButton.setAttribute("aria-label", "Skip tutorial");
-      popover.closeButton.innerHTML =
-        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    },
-    onDestroyed: finishTutorial,
-    steps: [
-      {
-        popover: {
-          title: "Welcome to Hellish Golf",
-          description:
-            "Climb the pit, survive the hazards, and finish in as few strokes as possible. Your account starts with <strong>3 of every power-up</strong>.",
-        },
-      },
-      {
-        element: "#game-root",
-        popover: {
-          title: "Shoot the ball",
-          description:
-            "Press on the ball, drag opposite the direction you want to travel, then release. A longer pull creates a stronger shot.",
-          side: "bottom",
-          align: "center",
-        },
-      },
-      {
-        element: "#hud-strokes",
-        popover: {
-          title: "Every kick counts",
-          description:
-            "This is your stroke count. The daily leaderboard rewards the lowest score, with completion time breaking ties.",
-          side: "left",
-          align: "center",
-        },
-      },
-      {
-        element: "#coin-wallet",
-        popover: {
-          title: "Collect coins",
-          description:
-            "Coins appear throughout each daily map. Each coin can be collected once per account for that map and buys power-ups or ball skins.",
-          side: "top",
-          align: "start",
-        },
-      },
-      {
-        element: "#btn-shop",
-        popover: {
-          title: "Open the shop",
-          description:
-            "The shop keeps power-ups and skins together. Your coin balance is always shown on this button.",
-          side: "right",
-          align: "center",
-          onNextClick: (_element, _step, { driver: tour }) => {
-            openShop("powerups");
-            tour.moveNext();
-          },
-        },
-      },
-      {
-        element: "#shop-powerups",
-        popover: {
-          title: "Buy power-ups",
-          description:
-            "Trajectory predicts one shot. Sticky Slime lets you place a sticky wall patch. Checkpoint creates one safe return flag where the ball is grounded.",
-          side: "left",
-          align: "center",
-          onNextClick: (_element, _step, { driver: tour }) => {
-            setShopTab("skins");
-            tour.moveNext();
-          },
-          onPrevClick: (_element, _step, { driver: tour }) => {
-            hide("shop-overlay");
-            tour.movePrevious();
-          },
-        },
-      },
-      {
-        element: "#shop-skins",
-        popover: {
-          title: "Choose a ball skin",
-          description:
-            "Buy a skin once, then equip it whenever you want. Skins change appearance only and do not change physics.",
-          side: "left",
-          align: "center",
-          onNextClick: (_element, _step, { driver: tour }) => {
-            hide("shop-overlay");
-            tour.moveNext();
-          },
-          onPrevClick: (_element, _step, { driver: tour }) => {
-            setShopTab("powerups");
-            tour.movePrevious();
-          },
-        },
-      },
-      {
-        element: "#powerup-bar",
-        popover: {
-          title: "Use what you own",
-          description:
-            "Owned power-ups appear here during play. Select one, then follow its prompt. A power-up is deducted only when its effect activates.",
-          side: "top",
-          align: "center",
-          onNextClick: (_element, _step, { driver: tour }) => {
-            showFeatureMarkers(true);
-            tour.moveNext();
-          },
-          onPrevClick: (_element, _step, { driver: tour }) => {
-            openShop("skins");
-            tour.movePrevious();
-          },
-        },
-      },
-      {
-        element: "#tutorial-checkpoint-anchor",
-        popover: {
-          title: "Land on checkpoints",
-          description:
-            "You must land on the checkpoint ground for it to count. The flag is not solid. Once activated, deaths return you to that flag, and lower checkpoints cannot replace higher progress.",
-          side: "top",
-          align: "center",
-          onPrevClick: (_element, _step, { driver: tour }) => {
-            showFeatureMarkers(false);
-            tour.movePrevious();
-          },
-        },
-      },
-      {
-        element: "#tutorial-finish-anchor",
-        popover: {
-          title: "Reach the win point",
-          description:
-            "Land and come to rest on the finish platform to complete the daily hole. Your score and replay are submitted when the finish triggers.",
-          side: "top",
-          align: "center",
-          onNextClick: (_element, _step, { driver: tour }) => {
-            showFeatureMarkers(false);
-            tour.moveNext();
-          },
-        },
-      },
-      {
-        popover: {
-          title: "Ready for the pit",
-          description:
-            "You have 3 Trajectory, 3 Sticky Slime, and 3 Checkpoint power-ups. Collect coins, improve your daily score, and climb the leaderboard.",
-          onPrevClick: (_element, _step, { driver: tour }) => {
-            showFeatureMarkers(true);
-            tour.movePrevious();
-          },
-        },
-      },
-    ],
-  });
-
-  onboarding.drive();
+  el<HTMLElement>("quick-guide").hidden = false;
 }
 
 function retry() {
@@ -893,7 +704,9 @@ function wireUi() {
     hide("menu-overlay");
     openLeaderboard();
   });
-  el("menu-tutorial").addEventListener("click", () => startTutorial(true));
+  el("menu-tutorial").addEventListener("click", () => showQuickGuide(true));
+  el("quick-guide-close").addEventListener("click", dismissQuickGuide);
+  el("quick-guide-done").addEventListener("click", dismissQuickGuide);
   el("menu-settings").addEventListener("click", () => {
     hide("menu-overlay");
     paintZoomChoices();
@@ -1023,7 +836,7 @@ async function main() {
     startGame(data, map);
     wireGameEvents();
     void loadLeaderboard();
-    window.setTimeout(() => startTutorial(), 650);
+    window.setTimeout(() => showQuickGuide(), 650);
   } catch (err) {
     console.error("init failed", err);
     el("loading").textContent = "Failed to load hole. Refresh to retry.";
