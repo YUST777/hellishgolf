@@ -227,6 +227,38 @@ body.inline-view #inline-expand-overlay {
   font-weight: 500;
 }
 
+/* Compact HUD on narrow screens: the title box + four pills cannot fit
+   in a phone-width row, so drop the decorative title (the Reddit header
+   already names the game), shrink the pills, and wrap them right-aligned
+   in the space left of the menu button instead of overlapping it. */
+@media (max-width: 640px) {
+  #game-title-text {
+    display: none;
+  }
+  .hud {
+    max-width: calc(100vw - 64px);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 5px;
+    padding: 8px;
+  }
+  .hud .pill {
+    padding: 4px 9px;
+    font-size: 12px;
+    gap: 4px;
+  }
+  .hud .label {
+    font-size: 8px;
+  }
+  #hole-date {
+    display: none;
+  }
+  .hole-meta {
+    flex-direction: row;
+    align-items: baseline !important;
+  }
+}
+
 /* Round icon buttons (menu, leaderboard) -----------------------------*/
 .icon-btn {
   position: fixed;
