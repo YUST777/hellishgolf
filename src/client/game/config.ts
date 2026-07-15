@@ -42,12 +42,12 @@ export const POWER_EXP = 1.2;
 export const BALL_VISUAL_RADIUS = 18;
 
 /** The reference uses three discrete, persisted zoom choices. */
-export const ZOOM_STORAGE_KEY = "khg_default_zoom";
+export const ZOOM_STORAGE_KEY = "hellishgolf_default_zoom";
 export const ZOOM_LEVELS = [1, 0.5, 0.35] as const;
 export const DEFAULT_ZOOM = 1;
 
 /** Kinda Infuriating Mode: disables checkpoints for a harder run. */
-export const INFURIATING_STORAGE_KEY = "khg_infuriating";
+export const INFURIATING_STORAGE_KEY = "hellishgolf_infuriating";
 
 /** The daily hole rolls over at 05:00 UTC (matches the devvit scheduler cron). */
 export const DAILY_RESET_HOUR_UTC = 5;

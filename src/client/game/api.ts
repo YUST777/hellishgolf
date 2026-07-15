@@ -45,7 +45,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 // client-side: pick the daily hole from the map pool by date, keep the best
 // score in localStorage, and show an empty leaderboard.
 
-const OFFLINE_BEST_KEY = "khg_offline_best";
+const OFFLINE_BEST_KEY = "hellishgolf_offline_best";
 
 function todayKeyUTC(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD

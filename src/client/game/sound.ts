@@ -18,7 +18,7 @@
  */
 
 const BASE = "game/audio";
-const MUTE_STORAGE_KEY = "khg_muted";
+const MUTE_STORAGE_KEY = "hellishgolf_muted";
 
 export type Sfx =
   | "BallHit"
