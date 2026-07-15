@@ -104,6 +104,16 @@ export interface SubmitScoreResponse {
   improved: boolean;
 }
 
+/** Broadcast on the post's realtime channel when any player finishes a run. */
+export type LiveFinishMessage = {
+  type: "finish";
+  accountId: string;
+  username: string;
+  strokes: number;
+  timeMs: number;
+  rank: number;
+};
+
 export interface LeaderboardEntry {
   username: string;
   strokes: number;

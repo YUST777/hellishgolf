@@ -539,6 +539,37 @@ body.inline-view #inline-expand-overlay {
   transform: translateX(-50%) translateY(0);
 }
 
+/* Live finish feed (other players completing the hole) ---------------*/
+#live-toast {
+  position: fixed;
+  left: 50%;
+  top: 72px;
+  transform: translateX(-50%) translateY(-16px);
+  max-width: min(92vw, 420px);
+  background: linear-gradient(180deg, rgba(46, 12, 4, 0.95), rgba(26, 6, 3, 0.95));
+  border: 2px solid #8a4b0f;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+  color: #ffd65a;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  z-index: 14;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.3s,
+    transform 0.3s;
+}
+#live-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+body.inline-view #live-toast {
+  display: none;
+}
+
 /* Modal system (parchment) ------------------------------------------*/
 .overlay {
   position: fixed;

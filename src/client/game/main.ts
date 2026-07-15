@@ -2,6 +2,7 @@ import "./tutorial.css";
 import { apiClient } from "./api";
 import { setupInlineMode } from "./inlineMode";
 import { loadLeaderboard } from "./leaderboard";
+import { setupLiveFeed } from "./liveFeed";
 import { ensureRapier } from "./physics";
 import { applyPlayerState, loadPowerupState } from "./powerups";
 import { loadMap, startGame } from "./session";
@@ -49,6 +50,7 @@ async function main() {
     startGame(data, map);
     wireGameEvents();
     void loadLeaderboard();
+    setupLiveFeed(data.postId);
     // Don't interrupt the inline feed preview with the tutorial dialog.
     if (!inline) window.setTimeout(() => showQuickGuide(), 650);
   } catch (err) {

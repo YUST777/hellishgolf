@@ -24,6 +24,7 @@
   },
   "permissions": {
     "redis": true,
+    "realtime": true,
     "http": {
       "enable": true,
       "domains": ["hellishgolf.xyz", "www.hellishgolf.xyz"]

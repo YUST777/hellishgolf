@@ -1,9 +1,10 @@
 import { Hono } from "hono";
-import { context, reddit } from "@devvit/web/server";
+import { context, realtime, reddit } from "@devvit/web/server";
 import type {
   CollectCoinRequest,
   InitResponse,
   LeaderboardResponse,
+  LiveFinishMessage,
   PlayerActionResponse,
   PowerupActionRequest,
   SkinActionRequest,
@@ -232,6 +233,20 @@ api.post("/score", async (c) => {
       timeMs,
       moves: body.moves,
     });
+
+    // Announce the finish to everyone with this post open (best-effort).
+    try {
+      await realtime.send<LiveFinishMessage>(`finish_${postId}`, {
+        type: "finish",
+        accountId,
+        username,
+        strokes,
+        timeMs,
+        rank: result.rank,
+      });
+    } catch (error) {
+      console.error("realtime finish broadcast failed:", error);
+    }
 
     return c.json<SubmitScoreResponse>(result);
   } catch (error) {
