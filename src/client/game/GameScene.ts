@@ -791,13 +791,14 @@ export class GameScene extends Phaser.Scene {
   // --- coins --------------------------------------------------------------
 
   private createCoins() {
+    this.ensureCoinTexture();
     const spots = this.pickCoinSpots();
     for (const spot of spots) {
       const id = `coin-${spot.col}-${spot.row}`;
       if (this.collectedCoinIds.has(id)) continue;
       const { x, y } = this.cellCenter(spot.col, spot.row);
       const sprite = this.add.image(x, y, "coin").setDepth(35);
-      sprite.setDisplaySize(28, 28);
+      sprite.setScale(0.95);
       this.tweens.add({
         targets: sprite,
         y: y - 5,
@@ -808,6 +809,25 @@ export class GameScene extends Phaser.Scene {
       });
       this.coins.push({ id, sprite, x, y });
     }
+  }
+
+  private ensureCoinTexture() {
+    if (this.textures.exists("coin")) return;
+    const size = 24;
+    const c = size / 2;
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    g.fillStyle(0x000000, 0.25);
+    g.fillEllipse(c + 2, c + 3, 18, 10);
+    g.fillStyle(0x8a4b0f, 1);
+    g.fillCircle(c, c, 10);
+    g.fillStyle(0xffd65a, 1);
+    g.fillCircle(c, c, 8);
+    g.fillStyle(0xfff1a6, 0.95);
+    g.fillCircle(c - 3, c - 4, 3);
+    g.lineStyle(2, 0x6b3a09, 1);
+    g.strokeCircle(c, c, 9);
+    g.generateTexture("coin", size, size);
+    g.destroy();
   }
 
   private pickCoinSpots(): Array<{ col: number; row: number }> {
